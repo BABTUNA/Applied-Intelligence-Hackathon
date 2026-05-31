@@ -34,7 +34,11 @@
         "https://github.com/*",
         "https://*.amazon.com/*",
         "https://console.aws.amazon.com/*",
-        "https://*.console.aws.amazon.com/*"
+        "https://*.console.aws.amazon.com/*",
+        "https://claude.ai/*",
+        "https://*.claude.ai/*",
+        "https://www.anthropic.com/*",
+        "https://anthropic.com/*"
       ],
       "js": ["content.js"],
       "css": ["overlay.css"],
@@ -49,7 +53,11 @@
         "https://github.com/*",
         "https://*.amazon.com/*",
         "https://console.aws.amazon.com/*",
-        "https://*.console.aws.amazon.com/*"
+        "https://*.console.aws.amazon.com/*",
+        "https://claude.ai/*",
+        "https://*.claude.ai/*",
+        "https://www.anthropic.com/*",
+        "https://anthropic.com/*"
       ]
     }
   ]
