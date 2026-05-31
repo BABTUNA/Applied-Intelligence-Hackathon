@@ -368,54 +368,38 @@ function siteHintsFor(url) {
   }
 }
 
-async function callVision({ screenshotB64, elements, task, apiKey, siteHints }) {
-  const system = siteHints
-    ? `${VISION_SYSTEM}\n\n---\n\n${siteHints}`
-    : VISION_SYSTEM;
-  const body = {
-    model: VISION_MODEL,
-    max_tokens: 256,
-    system,
-    messages: [
-      {
-        role: "user",
-        content: [
-          {
-            type: "image",
-            source: {
-              type: "base64",
-              media_type: "image/jpeg",
-              data: screenshotB64,
-            },
-          },
-          {
-            type: "text",
-            text: `Task: ${task}\n\nElements (JSON):\n${JSON.stringify(elements)}`,
-          },
-        ],
-      },
-    ],
-  };
+// Vision call routes through the InsForge `vision-pick` edge function, which
+// proxies to OpenRouter (via the InsForge AI Gateway) and returns clean
+// {idx, instruction, done}. The Anthropic API key never leaves the server —
+// the extension only ever knows the InsForge URL.
+async function callVision({ screenshotB64, elements, task, siteHints, insforgeUrl }) {
+  if (!insforgeUrl) throw new Error("insforge url not configured");
 
-  const resp = await fetch("https://api.anthropic.com/v1/messages", {
+  const url = `${insforgeUrl.replace(/\/+$/, "")}/functions/vision-pick`;
+  const resp = await fetch(url, {
     method: "POST",
-    headers: {
-      "x-api-key": apiKey,
-      "anthropic-version": "2023-06-01",
-      "anthropic-dangerous-direct-browser-access": "true",
-      "content-type": "application/json",
-    },
-    body: JSON.stringify(body),
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      screenshot_b64: screenshotB64,
+      elements,
+      task,
+      site_hints: siteHints || null,
+    }),
   });
 
   if (!resp.ok) {
     const text = await resp.text();
-    throw new Error(`vision ${resp.status}: ${text.slice(0, 200)}`);
+    throw new Error(`vision-pick ${resp.status}: ${text.slice(0, 200)}`);
   }
 
   const data = await resp.json();
-  const text = data?.content?.[0]?.text || "";
-  return parseVisionJson(text);
+  if (data?.error) throw new Error(`vision-pick error: ${data.error}`);
+  if (typeof data?.idx !== "number") throw new Error("vision-pick returned no idx");
+  return {
+    idx: data.idx,
+    instruction: typeof data.instruction === "string" ? data.instruction : "Click this.",
+    done: typeof data.done === "boolean" ? data.done : false,
+  };
 }
 
 function parseVisionJson(text) {
@@ -531,8 +515,8 @@ async function requestNextLiveStep() {
   if (!st || st.status !== "active") return;
 
   const cfg = await getConfig();
-  if (!cfg.anthropic) {
-    console.error("[evernav] missing anthropic key — set it in options");
+  if (!cfg.insforgeUrl) {
+    console.error("[evernav] missing insforge url — set it in options");
     return;
   }
 
@@ -602,8 +586,8 @@ async function requestNextLiveStep() {
       screenshotB64,
       elements,
       task: st.task,
-      apiKey: cfg.anthropic,
       siteHints: siteHintsFor(tabMeta.url),
+      insforgeUrl: cfg.insforgeUrl,
     });
   } catch (e) {
     console.error("[evernav] vision call failed:", e);
