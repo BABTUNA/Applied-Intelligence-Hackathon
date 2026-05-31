@@ -17,32 +17,26 @@ Built for the **Applied Intelligence Hackathon @ Frontier Tower (2026-05-31)**.
 
 ## How it works
 
-```
-   ┌─ popup ──────────┐
-   │ "rotate my PAT"  │
-   └────────┬─────────┘
-            ▼
-   ┌─ background SW ──────────────────────────────────────────┐
-   │  1. Evermind /memories/search   ── cache hit? replay ────┼──► overlay
-   │  2. else: screenshot tab        + element list           │
-   │       → Sonnet 4.6 vision       → element idx + text     │
-   │  3. on click: record step, advance                       │
-   │  4. on done: Evermind /memories + Butterbase row         │
-   └──────────────────────────────────────────────────────────┘
-```
+<p align="center">
+  <img src="docs/architecture.svg" alt="EverNav architecture — two loops: Claude vision guidance + InsForge logging with realtime fan-out" width="780"/>
+</p>
 
-- **Anthropic Claude Sonnet 4.6** — the vision call that picks the next click target
-- **Evermind EverOS** — stores completed trails as shared "skills"; the cross-user cache hit is the demo wow moment
-- **Butterbase** — logs each session, hosts the static companion dashboard
+Two loops running side by side:
+
+1. **Live guidance loop** — extension screenshots the active tab, sends the screenshot + DOM element list to **Claude Sonnet 4.6 vision**, gets back `{idx, instruction, done}`, blurs the page and halos the chosen element. Repeats on every click.
+
+2. **Logging loop** — when the task is done, the extension POSTs to the InsForge **edge function** `log-session`, which calls the InsForge **AI gateway** (OpenRouter → Claude Haiku 4.5) to classify the task into one of `security / navigation / configuration / other`, then inserts the row into the **Postgres** `sessions` table. An `AFTER INSERT` trigger publishes a `session_logged` event over **realtime** WebSockets, fan-out to the **Next.js dashboard** hosted on InsForge — counters tick up and the matching card flashes lime, no refresh.
+
+That's six InsForge surfaces lit up by one user click.
 
 ## Repo layout
 
 ```
 extension/    Chrome MV3 extension (sideload in developer mode)
-dashboard/    Next.js static-export dashboard, deployed via Butterbase
-fixtures/     Pre-recorded fallback trails for demo safety
-scripts/      Cache priming + demo helpers
-docs/         Demo-day pre-flight checklist
+dashboard/    Next.js static-export dashboard, deployed via InsForge
+functions/    InsForge edge functions (log-session)
+migrations/   Postgres schema migrations (sessions table, RLS, realtime trigger)
+docs/         Logo, architecture diagram, demo-day pre-flight
 ```
 
 ## Setup
