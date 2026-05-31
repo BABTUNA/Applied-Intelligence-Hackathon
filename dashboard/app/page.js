@@ -172,6 +172,32 @@ export default function Home() {
         </p>
       </section>
 
+      {/* Live request flow — packet animates on every realtime event */}
+      <div className="section-head">
+        <h2>Request flow</h2>
+        <span className="stamp">live · per session</span>
+      </div>
+      <section className="pipeline-wrap">
+        <div className={`pipeline ${stackPulse > 0 ? "firing" : ""}`} key={`pipe-${stackPulse}`}>
+          <div className="pipeline-track" />
+          <div className="pipeline-packet" />
+          {[
+            { key: "ext", label: "extension",  note: "chrome MV3" },
+            { key: "fn",  label: "function",   note: "log-session" },
+            { key: "ai",  label: "ai gateway", note: "claude haiku" },
+            { key: "db",  label: "database",   note: "sessions ↑" },
+            { key: "rt",  label: "realtime",   note: "ws fan-out" },
+            { key: "ui",  label: "dashboard",  note: "this page" },
+          ].map((n, i) => (
+            <div className="pipeline-node" key={n.key} style={{ ["--i"]: i }}>
+              <span className="pipeline-node-square" />
+              <span className="pipeline-node-label">{n.label}</span>
+              <span className="pipeline-node-note">{n.note}</span>
+            </div>
+          ))}
+        </div>
+      </section>
+
       {/* Powered by InsForge — six feature pills */}
       <div className="section-head">
         <h2>Powered by InsForge</h2>

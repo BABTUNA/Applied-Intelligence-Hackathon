@@ -344,6 +344,147 @@ footer {
   50% { opacity: 1; transform: scale(1.4); box-shadow: 0 0 12px var(--accent); }
 }
 
+/* ─── pipeline (3D-ish live request flow) ────────────────────────────── */
+
+.pipeline-wrap {
+  perspective: 1200px;
+  perspective-origin: 50% 130%;
+  margin-bottom: 28px;
+}
+
+.pipeline {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 14px;
+  padding: 32px 18px 28px;
+  background: linear-gradient(180deg, rgba(18,20,19,0.85), rgba(10,11,10,0.85));
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  transform: rotateX(14deg) translateZ(0);
+  transform-style: preserve-3d;
+  box-shadow:
+    0 30px 60px -20px rgba(0, 0, 0, 0.7),
+    0 0 0 1px rgba(197, 255, 0, 0.04) inset;
+  overflow: hidden;
+}
+
+/* dotted floor grid for depth */
+.pipeline::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(197,255,0,0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(197,255,0,0.06) 1px, transparent 1px);
+  background-size: 32px 32px;
+  background-position: -1px -1px;
+  pointer-events: none;
+  mask-image: linear-gradient(180deg, transparent 0%, black 35%, black 100%);
+  -webkit-mask-image: linear-gradient(180deg, transparent 0%, black 35%, black 100%);
+}
+
+.pipeline-track {
+  position: absolute;
+  top: 50%;
+  left: 36px;
+  right: 36px;
+  height: 2px;
+  background: linear-gradient(90deg,
+    rgba(197,255,0,0.15) 0%,
+    rgba(197,255,0,0.45) 50%,
+    rgba(197,255,0,0.15) 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 0 12px rgba(197, 255, 0, 0.3);
+  pointer-events: none;
+}
+
+.pipeline-node {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 14px 8px 10px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  z-index: 1;
+  transform: translateZ(calc(var(--i, 0) * 0px));
+  transition: border-color 220ms ease, transform 220ms ease, box-shadow 220ms ease;
+}
+
+.pipeline-node:hover {
+  border-color: var(--accent-dim);
+  transform: translateZ(8px) translateY(-2px);
+  box-shadow: 0 12px 24px rgba(0,0,0,0.4), 0 0 24px rgba(197,255,0,0.18);
+}
+
+.pipeline-node-square {
+  width: 14px;
+  height: 14px;
+  background: var(--accent);
+  opacity: 0.85;
+  box-shadow: 0 0 12px rgba(197, 255, 0, 0.5);
+}
+
+.pipeline-node-label {
+  font: 600 11px/1 var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--ink);
+}
+
+.pipeline-node-note {
+  font: 500 9.5px/1 var(--font-mono);
+  text-transform: lowercase;
+  letter-spacing: 0.3px;
+  color: var(--muted);
+}
+
+.pipeline-packet {
+  position: absolute;
+  top: 50%;
+  left: 36px;
+  width: 14px;
+  height: 14px;
+  margin-top: -7px;
+  margin-left: -7px;
+  background: var(--accent);
+  border-radius: 50%;
+  opacity: 0;
+  box-shadow:
+    0 0 0 4px rgba(197, 255, 0, 0.3),
+    0 0 24px 4px rgba(197, 255, 0, 0.8),
+    0 0 48px 8px rgba(197, 255, 0, 0.4);
+  pointer-events: none;
+  z-index: 3;
+}
+
+.pipeline.firing .pipeline-packet {
+  animation: packet-travel 1.8s cubic-bezier(0.65, 0, 0.35, 1);
+}
+.pipeline.firing .pipeline-node:nth-child(3) { animation: node-pop 1.8s ease-out 0.12s; }
+.pipeline.firing .pipeline-node:nth-child(4) { animation: node-pop 1.8s ease-out 0.36s; }
+.pipeline.firing .pipeline-node:nth-child(5) { animation: node-pop 1.8s ease-out 0.60s; }
+.pipeline.firing .pipeline-node:nth-child(6) { animation: node-pop 1.8s ease-out 0.84s; }
+.pipeline.firing .pipeline-node:nth-child(7) { animation: node-pop 1.8s ease-out 1.08s; }
+.pipeline.firing .pipeline-node:nth-child(8) { animation: node-pop 1.8s ease-out 1.32s; }
+
+@keyframes packet-travel {
+  0%   { left: 8%;  opacity: 0; transform: scale(0.4); }
+  8%   { opacity: 1; transform: scale(1); }
+  92%  { opacity: 1; transform: scale(1); }
+  100% { left: 92%; opacity: 0; transform: scale(0.4); }
+}
+
+@keyframes node-pop {
+  0%   { border-color: var(--border); box-shadow: 0 0 0 0 rgba(197,255,0,0); }
+  6%   { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(197,255,0,0.25), 0 0 24px 4px rgba(197,255,0,0.5); transform: translateY(-3px); }
+  20%  { border-color: var(--accent); box-shadow: 0 0 0 1px rgba(197,255,0,0.2), 0 0 12px 2px rgba(197,255,0,0.3); transform: translateY(0); }
+  100% { border-color: var(--border); box-shadow: 0 0 0 0 rgba(197,255,0,0); }
+}
+
 /* ─── stack-row (Powered by InsForge feature pills) ───────────────────── */
 
 .stack-row {

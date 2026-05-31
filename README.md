@@ -1,11 +1,19 @@
-# EverNav
+<p align="center">
+  <img src="docs/logo.svg" alt="EverNav — live agent navigation for hostile web UIs" width="780"/>
+</p>
+
+<p align="center">
+  <a href="https://uqi28a23.insforge.site"><b>Live dashboard</b></a> ·
+  <a href="#how-it-works">How it works</a> ·
+  <a href="#setup">Setup</a>
+</p>
 
 A Chrome extension that guides you through complex web UIs.
 Type what you want to do, and EverNav blurs the page and glows the exact
-element to click. Once one user completes a task, every future user gets
-that click-trail replayed instantly from memory.
+element to click. Every completed task is logged to InsForge in real time —
+the next agent picks up where the last one left off.
 
-Built for the **Beta Fund × Evermind One Person Company Hackathon (2026-05-30)**.
+Built for the **Applied Intelligence Hackathon @ Frontier Tower (2026-05-31)**.
 
 ## How it works
 
