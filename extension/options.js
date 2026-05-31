@@ -1,4 +1,4 @@
-const KEYS = ["anthropic", "evermind", "butterbase", "bbAppId"];
+const KEYS = ["anthropic", "insforgeUrl", "insforgeAnonKey"];
 const $ = (id) => document.getElementById(id);
 
 async function load() {

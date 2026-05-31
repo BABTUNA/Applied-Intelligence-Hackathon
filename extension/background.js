@@ -10,7 +10,6 @@
 // Structure: all stubs in this commit; vision/evermind/butterbase wired in later commits.
 
 const KEEPALIVE_ALARM = "evernav-keepalive";
-const SHARED_USER = "global_skills"; // cross-user cache-hit bucket
 
 // ─── state helpers ────────────────────────────────────────────────────────────
 
@@ -51,9 +50,8 @@ chrome.alarms.onAlarm.addListener((alarm) => {
 async function getConfig() {
   return await chrome.storage.local.get([
     "anthropic",
-    "evermind",
-    "butterbase",
-    "bbAppId",
+    "insforgeUrl",
+    "insforgeAnonKey",
   ]);
 }
 
@@ -298,147 +296,20 @@ function parseVisionJson(text) {
   throw new Error(`vision returned non-JSON: ${text.slice(0, 120)}`);
 }
 
-// Verified against the everos Python SDK v0.4.0 (base_url https://api.evermind.ai,
-// Authorization: Bearer). Endpoints: POST /api/v1/memories, /memories/search,
-// /memories/flush.
-const EVERMIND_BASE = "https://api.evermind.ai/api/v1";
+// (Evermind integration removed for the Applied Intelligence branch — today's
+// stack is Anthropic + InsForge only.)
 
-function slugify(s) {
-  return String(s)
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 64);
-}
-
-function sessionIdFor(site, task) {
-  // Encodes site + task into a single filterable field. If filters in Evermind
-  // turns out to accept only user_id (not arbitrary keys), session_id is still
-  // first-class and we can filter on that instead.
-  return `${site}::${slugify(task)}`;
-}
-
-async function evermindRead({ task, site }) {
+// InsForge PostgREST: POST {oss_host}/api/rest/v1/sessions with the row body
+// as JSON, authenticated as the anon role. RLS policy 'anon_insert_sessions'
+// allows the write; service-key bypass not needed for hackathon scope.
+async function insforgeLog({ user, site, task, stepCount }) {
   const cfg = await getConfig();
-  if (!cfg.evermind) return null;
-
-  const body = {
-    query: `${task} on ${site}`,
-    method: "hybrid",
-    memory_types: ["episodic_memory"],
-    top_k: 3,
-    filters: { user_id: SHARED_USER },
-  };
-
-  let resp;
-  try {
-    resp = await fetch(`${EVERMIND_BASE}/memories/search`, {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${cfg.evermind}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(body),
-    });
-  } catch (e) {
-    console.warn("[evernav] evermind unreachable:", e.message);
-    return null;
-  }
-  if (!resp.ok) {
-    console.warn("[evernav] evermind search non-2xx:", resp.status);
-    return null;
-  }
-
-  const data = await resp.json();
-  console.log("[evernav] evermind raw search response:", data);
-
-  // The hybrid search response shape can vary across versions. Walk a few
-  // common spots, coerce object-shaped wrappers to arrays, and never throw.
-  let hits =
-    data?.results ||
-    data?.memories ||
-    data?.hits ||
-    data?.data ||
-    data?.items ||
-    [];
-  if (!Array.isArray(hits)) {
-    if (Array.isArray(hits?.items)) hits = hits.items;
-    else if (Array.isArray(hits?.results)) hits = hits.results;
-    else if (typeof hits === "object" && hits !== null) hits = [hits];
-    else hits = [];
-  }
-  const wantId = sessionIdFor(site, task);
-
-  for (const h of hits) {
-    // Try common content paths.
-    const raw =
-      h?.content ||
-      h?.message?.content ||
-      h?.messages?.[0]?.content ||
-      h?.text ||
-      "";
-    if (!raw) continue;
-    let parsed;
-    try { parsed = JSON.parse(raw); } catch { continue; }
-    if (!parsed?.trail || !Array.isArray(parsed.trail)) continue;
-
-    // Prefer exact session_id match (set on write); fall back to site match.
-    const matchesId = h?.session_id === wantId || parsed?.session_id === wantId;
-    const matchesSite = parsed?.site === site;
-    if (matchesId || matchesSite) return parsed;
-  }
-  return null;
-}
-
-async function evermindWrite({ task, site, trail }) {
-  const cfg = await getConfig();
-  if (!cfg.evermind) return;
-
-  const session_id = sessionIdFor(site, task);
-  const payload = {
-    user_id: SHARED_USER,
-    session_id,
-    messages: [
-      {
-        message_id: `evernav-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-        sender_id: "evernav",
-        sender_name: "EverNav Recorder",
-        role: "assistant",
-        timestamp: Date.now(),
-        content: JSON.stringify({ task, site, session_id, trail }),
-      },
-    ],
-  };
-
-  try {
-    const resp = await fetch(`${EVERMIND_BASE}/memories`, {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${cfg.evermind}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(payload),
-    });
-    if (!resp.ok) {
-      console.warn("[evernav] evermind write non-2xx:", resp.status, await resp.text());
-    }
-  } catch (e) {
-    console.warn("[evernav] evermind write failed:", e.message);
-  }
-}
-
-// REST API: POST /v1/{app_id}/{table} with the row body as JSON.
-// Confirmed via the Butterbase MCP docs.
-const BUTTERBASE_BASE = "https://api.butterbase.ai/v1";
-
-async function butterbaseLog({ user, site, task, stepCount }) {
-  const cfg = await getConfig();
-  if (!cfg.butterbase || !cfg.bbAppId) {
-    console.warn("[evernav] butterbase key/appId not set — skipping log");
+  if (!cfg.insforgeUrl || !cfg.insforgeAnonKey) {
+    console.warn("[evernav] insforge url/anon key not set — skipping log");
     return;
   }
 
-  const url = `${BUTTERBASE_BASE}/${encodeURIComponent(cfg.bbAppId)}/sessions`;
+  const url = `${cfg.insforgeUrl.replace(/\/+$/, "")}/api/database/records/sessions`;
   const body = {
     user_id: user,
     site,
@@ -451,16 +322,18 @@ async function butterbaseLog({ user, site, task, stepCount }) {
     const resp = await fetch(url, {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${cfg.butterbase}`,
+        "apikey": cfg.insforgeAnonKey,
+        "Authorization": `Bearer ${cfg.insforgeAnonKey}`,
         "Content-Type": "application/json",
+        "Prefer": "return=minimal",
       },
       body: JSON.stringify(body),
     });
     if (!resp.ok) {
-      console.warn("[evernav] butterbase log non-2xx:", resp.status, await resp.text());
+      console.warn("[evernav] insforge log non-2xx:", resp.status, await resp.text());
     }
   } catch (e) {
-    console.warn("[evernav] butterbase log failed:", e.message);
+    console.warn("[evernav] insforge log failed:", e.message);
   }
 }
 
@@ -606,10 +479,9 @@ async function onStepCompleted({ stepIndex, target }) {
   const trail = [...(st.trail || []), { stepIndex, target }];
   await setState({ trail, step: stepIndex + 1 });
 
-  // If this was the final step (vision returned done:true earlier), persist + log.
+  // If this was the final step (vision returned done:true earlier), log + close.
   if (st.taskDone) {
-    await evermindWrite({ task: st.task, site: st.site, trail });
-    await butterbaseLog({
+    await insforgeLog({
       user: st.user,
       site: st.site,
       task: st.task,
@@ -704,18 +576,6 @@ async function demoOpenDashboard() {
   await chrome.tabs.create({ url: dashboardUrl });
 }
 
-async function demoReprimeCache() {
-  const st = await getState();
-  const fb = await getFallbackTrail();
-  if (!fb) return;
-  await evermindWrite({
-    task: fb.task,
-    site: fb.site,
-    trail: fb.trail,
-  });
-  console.log("[evernav] cache re-primed:", fb.task);
-}
-
 // ─── message router ───────────────────────────────────────────────────────────
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
@@ -752,10 +612,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           await demoOpenDashboard();
           sendResponse({ ok: true });
           break;
-        case "DEMO_REPRIME_CACHE":
-          await demoReprimeCache();
-          sendResponse({ ok: true });
-          break;
+        // DEMO_REPRIME_CACHE removed (no Evermind cache to reprime on this branch)
         default:
           sendResponse({ ok: false, error: `unknown type: ${msg.type}` });
       }

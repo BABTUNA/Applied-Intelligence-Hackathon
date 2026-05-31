@@ -207,24 +207,16 @@
   </fieldset>
 
   <fieldset>
-    <legend>Evermind · memory</legend>
+    <legend>InsForge · data</legend>
     <div class="row">
-      <label for="evermind">API key</label>
-      <input type="password" id="evermind" placeholder="evos_…" autocomplete="off" />
-      <div class="hint">Cloud endpoint at <code>api.evermind.ai</code>. Stores click trails.</div>
-    </div>
-  </fieldset>
-
-  <fieldset>
-    <legend>Butterbase · data</legend>
-    <div class="row">
-      <label for="butterbase">API key</label>
-      <input type="password" id="butterbase" placeholder="bb_sk_…" autocomplete="off" />
+      <label for="insforgeUrl">Project URL</label>
+      <input type="text" id="insforgeUrl" placeholder="https://&lt;appkey&gt;.&lt;region&gt;.insforge.app" autocomplete="off" />
+      <div class="hint">From <code>.insforge/project.json</code> as <code>oss_host</code>, or the dashboard.</div>
     </div>
     <div class="row">
-      <label for="bbAppId">App ID</label>
-      <input type="text" id="bbAppId" placeholder="app_0aemhsdroh0j" autocomplete="off" />
-      <div class="hint">Returned by <code>init_app</code>. Looks like <code>app_xxxxxxxxxxxx</code>.</div>
+      <label for="insforgeAnonKey">Anon JWT</label>
+      <input type="password" id="insforgeAnonKey" placeholder="eyJhbGciOi…" autocomplete="off" />
+      <div class="hint">Public client key — NOT the <code>ik_</code> admin key. Safe to bundle.</div>
     </div>
   </fieldset>
 

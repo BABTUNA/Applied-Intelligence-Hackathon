@@ -2,15 +2,20 @@
 
 import { useEffect, useState } from "react";
 
-const BB_BASE = process.env.NEXT_PUBLIC_BUTTERBASE_BASE || "https://api.butterbase.ai/v1";
-const BB_APP = process.env.NEXT_PUBLIC_BB_APP_ID || "";
-const BB_KEY = process.env.NEXT_PUBLIC_BB_READ_KEY || "";
+const INSFORGE_URL = (process.env.NEXT_PUBLIC_INSFORGE_URL || "").replace(/\/+$/, "");
+const INSFORGE_ANON = process.env.NEXT_PUBLIC_INSFORGE_ANON_KEY || "";
 
 async function fetchSessions() {
-  if (!BB_APP || !BB_KEY) return null;
-  const url = `${BB_BASE}/${encodeURIComponent(BB_APP)}/sessions?order=completed_at.desc&limit=100`;
-  const resp = await fetch(url, { headers: { Authorization: `Bearer ${BB_KEY}` } });
-  if (!resp.ok) throw new Error(`butterbase ${resp.status}`);
+  if (!INSFORGE_URL || !INSFORGE_ANON) return null;
+  // InsForge: GET /api/database/records/sessions?order=completed_at.desc&limit=100
+  const url = `${INSFORGE_URL}/api/database/records/sessions?order=completed_at.desc&limit=100`;
+  const resp = await fetch(url, {
+    headers: {
+      apikey: INSFORGE_ANON,
+      Authorization: `Bearer ${INSFORGE_ANON}`,
+    },
+  });
+  if (!resp.ok) throw new Error(`insforge ${resp.status}`);
   const data = await resp.json();
   if (Array.isArray(data)) return data;
   return data?.rows || data?.data || [];
@@ -80,14 +85,14 @@ export default function Home() {
         <p>
           A Chrome extension that watches the active tab and walks you through complex flows —
           rotate a token, configure a webhook, change a setting — one glowing step at a time.
-          Every completed task is written to <code>evermind</code> as a shared skill the next
-          agent can replay.
+          Every completed task is logged to <code>insforge</code> so the next
+          agent picks up where this one left off.
         </p>
       </section>
 
       <div className="section-head">
         <h2>Live telemetry</h2>
-        <span className="stamp">butterbase · sessions</span>
+        <span className="stamp">insforge · sessions</span>
       </div>
 
       <section className="grid">
@@ -108,16 +113,16 @@ export default function Home() {
       <footer>
         <span>EverNav · Beta Fund × Evermind · 2026</span>
         {state === "live" && (
-          <span className="status-pill"><span className="pulse" />Live · Butterbase</span>
+          <span className="status-pill"><span className="pulse" />Live · InsForge</span>
         )}
         {state === "loading" && (
           <span className="status-pill">Loading…</span>
         )}
         {state === "unconfigured" && (
-          <span className="status-pill">Set NEXT_PUBLIC_BB_APP_ID + READ_KEY</span>
+          <span className="status-pill">Set NEXT_PUBLIC_INSFORGE_URL + ANON_KEY</span>
         )}
         {state === "error" && (
-          <span className="status-pill">Butterbase unreachable</span>
+          <span className="status-pill">InsForge unreachable</span>
         )}
       </footer>
     </main>
