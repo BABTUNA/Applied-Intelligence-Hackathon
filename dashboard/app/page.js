@@ -111,11 +111,19 @@ export default function Home() {
           evernav<span className="caret" />
         </div>
         <nav className="nav-links">
-          <a href="#">skills</a>
-          <a href="#">sessions</a>
-          <a href="#">docs</a>
+          <a href="https://github.com/BABTUNA/Applied-Intelligence-Hackathon" target="_blank" rel="noopener noreferrer">skills</a>
+          <a href="https://github.com/BABTUNA/Applied-Intelligence-Hackathon" target="_blank" rel="noopener noreferrer">sessions</a>
+          <a href="https://github.com/BABTUNA/Applied-Intelligence-Hackathon" target="_blank" rel="noopener noreferrer">docs</a>
         </nav>
-        <button className="cta">Get the extension</button>
+        <a
+          href="https://github.com/BABTUNA/Applied-Intelligence-Hackathon"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="cta"
+          style={{ display: "inline-flex", alignItems: "center", textDecoration: "none" }}
+        >
+          Get the extension
+        </a>
       </div>
 
       <section className="hero">
