@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>EverNav — API Keys</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,500&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+    :root {
+      --bg:        #0A0B0A;
+      --surface:   #121413;
+      --surface-2: #191B1A;
+      --ink:       #F2F2EE;
+      --ink-soft:  #BFC0BC;
+      --muted:     #7C817D;
+      --border:    #252824;
+      --accent:    #C5FF00;
+      --accent-warm: #D7FF3A;
+      --accent-dim: #6B8F1F;
+    }
+    * { box-sizing: border-box; }
+    body {
+      max-width: 620px;
+      margin: 48px auto;
+      padding: 32px;
+      background: var(--bg);
+      color: var(--ink);
+      font: 14px/1.55 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+    .brand {
+      display: inline-flex;
+      align-items: baseline;
+      gap: 2px;
+      font: 600 16px/1 'JetBrains Mono', monospace;
+      letter-spacing: -0.5px;
+      margin-bottom: 28px;
+    }
+    .brand .caret {
+      display: inline-block;
+      width: 10px;
+      height: 14px;
+      background: var(--accent);
+      margin-left: 2px;
+      transform: translateY(2px);
+      animation: caret-blink 1.2s steps(2, end) infinite;
+    }
+    @keyframes caret-blink { 50% { opacity: 0.3; } }
+    .meta {
+      display: flex;
+      gap: 12px;
+      font: 500 11px/1 'JetBrains Mono', monospace;
+      color: var(--muted);
+      margin-bottom: 14px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .meta .sep { color: var(--border); }
+    h1 {
+      font: 500 38px/1.1 'Source Serif 4', Georgia, serif;
+      letter-spacing: -0.8px;
+      margin: 0 0 14px;
+    }
+    p.lede {
+      color: var(--ink-soft);
+      margin: 0 0 28px;
+      font-size: 15px;
+      max-width: 520px;
+      line-height: 1.55;
+    }
+    p.lede code {
+      font: 500 13px/1 'JetBrains Mono', monospace;
+      background: var(--surface);
+      color: var(--accent);
+      padding: 2px 6px;
+      border-radius: 3px;
+    }
+    fieldset {
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 22px 22px 20px;
+      margin: 0 0 14px;
+      background: var(--surface);
+      position: relative;
+    }
+    fieldset::before {
+      content: "";
+      position: absolute;
+      left: 18px;
+      top: 18px;
+      width: 6px;
+      height: 6px;
+      background: var(--accent);
+      border-radius: 50%;
+    }
+    legend {
+      padding: 0 8px;
+      color: var(--muted);
+      font: 500 11px/1 'JetBrains Mono', monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.7px;
+    }
+    label {
+      display: block;
+      margin: 14px 0 6px;
+      font: 500 11px/1 'JetBrains Mono', monospace;
+      color: var(--ink-soft);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    fieldset .row:first-of-type label { margin-top: 4px; }
+    input[type="text"], input[type="password"] {
+      width: 100%;
+      padding: 11px 14px;
+      background: var(--bg);
+      color: var(--ink);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      font: 12px/1.4 'JetBrains Mono', ui-monospace, monospace;
+    }
+    input:focus {
+      outline: none;
+      border-color: var(--accent-dim);
+    }
+    .row { margin-bottom: 6px; }
+    .row:last-child { margin-bottom: 0; }
+    .hint {
+      color: var(--muted);
+      font-size: 12px;
+      margin-top: 8px;
+      line-height: 1.5;
+    }
+    .hint code {
+      background: var(--bg);
+      color: var(--accent);
+      padding: 1px 5px;
+      border-radius: 3px;
+      font-size: 11px;
+      font-family: 'JetBrains Mono', monospace;
+    }
+    button {
+      padding: 11px 22px;
+      background: var(--accent);
+      color: var(--bg);
+      border: none;
+      border-radius: 4px;
+      font: 600 12px/1 'JetBrains Mono', monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      cursor: pointer;
+      margin-top: 8px;
+    }
+    button:hover { background: var(--accent-warm); }
+    .status {
+      margin-top: 12px;
+      font: 12px/1 'JetBrains Mono', monospace;
+      color: var(--muted);
+      min-height: 16px;
+    }
+    .status.ok { color: var(--accent); }
+    .warn {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-left: 2px solid var(--accent);
+      color: var(--ink-soft);
+      padding: 12px 16px;
+      border-radius: 4px;
+      font-size: 13px;
+      margin-bottom: 22px;
+      line-height: 1.5;
+    }
+    .warn::before {
+      content: "Note · ";
+      color: var(--accent);
+      font: 600 11px/1 'JetBrains Mono', monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+  </style>
+</head>
+<body>
+  <div class="brand">evernav<span class="caret"></span></div>
+
+  <div class="meta">
+    <span>v0.1.0</span>
+    <span class="sep">/</span>
+    <span>byo keys</span>
+  </div>
+
+  <h1>API keys</h1>
+  <p class="lede">
+    Keys stay in your browser via <code>chrome.storage.local</code>.
+    They leave your machine only in direct calls to the listed APIs.
+  </p>
+
+  <div class="warn">
+    Bring your own keys. Don't commit these — they're not bundled in the extension build.
+  </div>
+
+  <fieldset>
+    <legend>Anthropic · vision</legend>
+    <div class="row">
+      <label for="anthropic">API key</label>
+      <input type="password" id="anthropic" placeholder="sk-ant-…" autocomplete="off" />
+      <div class="hint">Powers the live vision call. Set a spend cap before demoing.</div>
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend>Evermind · memory</legend>
+    <div class="row">
+      <label for="evermind">API key</label>
+      <input type="password" id="evermind" placeholder="evos_…" autocomplete="off" />
+      <div class="hint">Cloud endpoint at <code>api.evermind.ai</code>. Stores click trails.</div>
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend>Butterbase · data</legend>
+    <div class="row">
+      <label for="butterbase">API key</label>
+      <input type="password" id="butterbase" placeholder="bb_sk_…" autocomplete="off" />
+    </div>
+    <div class="row">
+      <label for="bbAppId">App ID</label>
+      <input type="text" id="bbAppId" placeholder="app_0aemhsdroh0j" autocomplete="off" />
+      <div class="hint">Returned by <code>init_app</code>. Looks like <code>app_xxxxxxxxxxxx</code>.</div>
+    </div>
+  </fieldset>
+
+  <button id="save">Save</button>
+  <div class="status" id="status"></div>
+
+  <script src="options.js"></script>
+</body>
+</html>

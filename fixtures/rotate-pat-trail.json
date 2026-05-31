@@ -1,0 +1,53 @@
+{
+  "task": "rotate my personal access token",
+  "site": "github.com",
+  "session_id": "github.com::rotate-my-personal-access-token",
+  "_note": "Best-guess trail based on GitHub's settings UI. RE-RECORD this after a successful live run: capture the actual signatures from a real session so the fallback matches what's in the live DOM. Each step's `target` is the signature used by content.js findElementBySignature.",
+  "trail": [
+    {
+      "instruction": "Open your profile menu in the top right.",
+      "target": {
+        "tag": "button",
+        "text": "open user navigation menu",
+        "aria": "open user navigation menu",
+        "role": "button"
+      }
+    },
+    {
+      "instruction": "Open Settings.",
+      "target": {
+        "tag": "a",
+        "text": "settings",
+        "aria": null,
+        "role": null
+      }
+    },
+    {
+      "instruction": "Scroll the sidebar and click Developer settings.",
+      "target": {
+        "tag": "a",
+        "text": "developer settings",
+        "aria": null,
+        "role": null
+      }
+    },
+    {
+      "instruction": "Open Personal access tokens.",
+      "target": {
+        "tag": "a",
+        "text": "personal access tokens",
+        "aria": null,
+        "role": null
+      }
+    },
+    {
+      "instruction": "Pick the token type — Tokens (classic).",
+      "target": {
+        "tag": "a",
+        "text": "tokens (classic)",
+        "aria": null,
+        "role": null
+      }
+    }
+  ]
+}

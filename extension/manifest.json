@@ -1,0 +1,52 @@
+{
+  "manifest_version": 3,
+  "name": "EverNav",
+  "version": "0.1.0",
+  "description": "Guides you through complex web UIs. Type a goal — get blurred-out clutter and a glowing next step.",
+
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "storage",
+    "tabs",
+    "alarms"
+  ],
+
+  "host_permissions": [
+    "<all_urls>"
+  ],
+
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "EverNav"
+  },
+
+  "options_page": "options.html",
+
+  "content_scripts": [
+    {
+      "matches": [
+        "https://github.com/*",
+        "https://*.amazon.com/*"
+      ],
+      "js": ["content.js"],
+      "css": ["overlay.css"],
+      "run_at": "document_idle"
+    }
+  ],
+
+  "web_accessible_resources": [
+    {
+      "resources": ["overlay.css"],
+      "matches": [
+        "https://github.com/*",
+        "https://*.amazon.com/*"
+      ]
+    }
+  ]
+}

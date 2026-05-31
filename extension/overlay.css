@@ -1,0 +1,244 @@
+/* EverNav overlay — dark dev-tool palette with electric lime accent.
+   All IDs/classes prefixed __evernav__ to avoid host-site collisions. */
+
+#__evernav_backdrop__ {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483645;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  background: rgba(10, 11, 10, 0.45);
+  pointer-events: none;
+  animation: __evernav_fade_in__ 220ms ease-out;
+}
+
+/* Sharp clone of the target, slightly larger than the element so blur
+   never seeps through anti-aliased edges. The bg + color are set inline
+   from the page's computed body styles so the cloned element keeps the
+   readability it had in its original context. */
+#__evernav_clone__ {
+  position: fixed;
+  z-index: 2147483646;
+  pointer-events: none;
+  border-radius: 6px;
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.15),
+    0 16px 40px rgba(0, 0, 0, 0.6);
+  overflow: hidden;
+}
+
+#__evernav_halo__ {
+  position: fixed;
+  z-index: 2147483647;
+  pointer-events: none;
+  border-radius: 8px;
+  box-shadow:
+    0 0 0 1px #0A0B0A,
+    0 0 0 4px #C5FF00,
+    0 0 28px 6px rgba(197, 255, 0, 0.55),
+    0 0 80px 20px rgba(197, 255, 0, 0.25);
+  animation: __evernav_pulse__ 1.6s ease-in-out infinite;
+}
+
+#__evernav_tooltip__ {
+  position: fixed;
+  z-index: 2147483647;
+  max-width: 320px;
+  padding: 14px 18px 14px 16px;
+  background: #0A0B0A;
+  color: #F2F2EE;
+  border: 1px solid #252824;
+  border-left: 2px solid #C5FF00;
+  border-radius: 4px;
+  font: 13px/1.45 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.4),
+    0 16px 40px rgba(0, 0, 0, 0.6);
+  animation: __evernav_fade_in__ 220ms ease-out;
+  pointer-events: none;
+  letter-spacing: -0.1px;
+}
+#__evernav_tooltip__ .__evernav_kicker__ {
+  display: block;
+  font: 600 10px/1 'JetBrains Mono', ui-monospace, "SF Mono", Menlo, monospace;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: #C5FF00;
+  margin-bottom: 6px;
+}
+
+@keyframes __evernav_pulse__ {
+  0%, 100% {
+    box-shadow:
+      0 0 0 1px #0A0B0A,
+      0 0 0 4px #C5FF00,
+      0 0 28px 6px rgba(197, 255, 0, 0.55),
+      0 0 80px 20px rgba(197, 255, 0, 0.25);
+  }
+  50% {
+    box-shadow:
+      0 0 0 1px #0A0B0A,
+      0 0 0 4px #C5FF00,
+      0 0 44px 10px rgba(197, 255, 0, 0.75),
+      0 0 120px 28px rgba(197, 255, 0, 0.35);
+  }
+}
+
+@keyframes __evernav_fade_in__ {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ─── "agent thinking" pill (top-right while waiting for Claude) ───────── */
+
+#__evernav_thinking_dim__ {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483644;
+  background: rgba(10, 11, 10, 0.18);
+  backdrop-filter: blur(1.5px);
+  -webkit-backdrop-filter: blur(1.5px);
+  pointer-events: none;
+  animation: __evernav_fade_in__ 220ms ease-out;
+}
+
+#__evernav_thinking__ {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 2147483647;
+  display: inline-flex;
+  align-items: center;
+  gap: 11px;
+  padding: 10px 16px 10px 14px;
+  background: #0A0B0A;
+  color: #F2F2EE;
+  border: 1px solid #252824;
+  border-left: 2px solid #C5FF00;
+  border-radius: 4px;
+  font: 500 12px/1 'JetBrains Mono', ui-monospace, "SF Mono", Menlo, monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.5),
+    0 14px 36px rgba(0, 0, 0, 0.55);
+  pointer-events: none;
+  animation: __evernav_fade_in__ 240ms ease-out;
+}
+
+#__evernav_thinking__ .__evernav_orb__ {
+  width: 8px;
+  height: 8px;
+  background: #C5FF00;
+  border-radius: 50%;
+  box-shadow: 0 0 0 0 rgba(197, 255, 0, 0.7), 0 0 14px rgba(197, 255, 0, 0.9);
+  animation: __evernav_orb_pulse__ 1.4s ease-in-out infinite;
+  flex-shrink: 0;
+}
+
+#__evernav_thinking__ .__evernav_label__ { white-space: nowrap; }
+
+#__evernav_thinking__ .__evernav_dots__ {
+  display: inline-flex;
+  gap: 4px;
+  margin-left: 2px;
+}
+#__evernav_thinking__ .__evernav_dots__ span {
+  width: 4px;
+  height: 4px;
+  background: #C5FF00;
+  border-radius: 50%;
+  opacity: 0.3;
+  animation: __evernav_dot_bounce__ 1.2s ease-in-out infinite;
+}
+#__evernav_thinking__ .__evernav_dots__ span:nth-child(2) { animation-delay: 0.18s; }
+#__evernav_thinking__ .__evernav_dots__ span:nth-child(3) { animation-delay: 0.36s; }
+
+@keyframes __evernav_orb_pulse__ {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(197, 255, 0, 0.65), 0 0 14px rgba(197, 255, 0, 0.7);
+  }
+  50% {
+    transform: scale(1.2);
+    box-shadow: 0 0 0 10px rgba(197, 255, 0, 0), 0 0 24px rgba(197, 255, 0, 1);
+  }
+}
+
+@keyframes __evernav_dot_bounce__ {
+  0%, 80%, 100% { opacity: 0.3; transform: translateY(0); }
+  40% { opacity: 1; transform: translateY(-3px); }
+}
+
+/* ─── persistent control bar (bottom of page while guidance is active) ──── */
+
+#__evernav_control__ {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2147483647;
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 8px 10px 18px;
+  background: #0A0B0A;
+  color: #F2F2EE;
+  border: 1px solid #252824;
+  border-radius: 999px;
+  font: 500 12px/1 'JetBrains Mono', ui-monospace, "SF Mono", Menlo, monospace;
+  letter-spacing: 0.2px;
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.5),
+    0 18px 48px rgba(0, 0, 0, 0.55);
+  pointer-events: auto;
+  max-width: 480px;
+  animation: __evernav_control_in__ 240ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+#__evernav_control__ .__evernav_control_dot__ {
+  width: 8px;
+  height: 8px;
+  background: #C5FF00;
+  border-radius: 50%;
+  box-shadow: 0 0 12px rgba(197, 255, 0, 0.7);
+  flex-shrink: 0;
+}
+
+#__evernav_control__ .__evernav_control_label__ {
+  font: 600 10px/1 'JetBrains Mono', monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.7px;
+  color: #C5FF00;
+}
+
+#__evernav_control__ .__evernav_control_task__ {
+  color: #BFC0BC;
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#__evernav_control__ .__evernav_stop__ {
+  background: transparent;
+  border: 1px solid #252824;
+  color: #F2F2EE;
+  font: 600 10px/1 'JetBrains Mono', monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.7px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: color 150ms ease, border-color 150ms ease, background 150ms ease;
+}
+#__evernav_control__ .__evernav_stop__:hover {
+  color: #0A0B0A;
+  background: #FF6B6B;
+  border-color: #FF6B6B;
+}
+
+@keyframes __evernav_control_in__ {
+  from { opacity: 0; transform: translate(-50%, 12px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}

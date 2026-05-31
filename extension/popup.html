@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>EverNav</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,500&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+    :root {
+      --bg:        #0A0B0A;
+      --surface:   #121413;
+      --surface-2: #191B1A;
+      --ink:       #F2F2EE;
+      --ink-soft:  #BFC0BC;
+      --muted:     #7C817D;
+      --border:    #252824;
+      --accent:    #C5FF00;
+      --accent-warm: #D7FF3A;
+      --accent-dim: #6B8F1F;
+    }
+    * { box-sizing: border-box; }
+    body {
+      width: 340px;
+      margin: 0;
+      padding: 18px 16px 14px;
+      background: var(--bg);
+      color: var(--ink);
+      font: 13px/1.5 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+    .head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-bottom: 14px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 16px;
+    }
+    .brand {
+      display: inline-flex;
+      align-items: baseline;
+      gap: 2px;
+      font: 600 14px/1 'JetBrains Mono', ui-monospace, monospace;
+      letter-spacing: -0.4px;
+    }
+    .brand .caret {
+      display: inline-block;
+      width: 8px;
+      height: 13px;
+      background: var(--accent);
+      margin-left: 2px;
+      transform: translateY(1px);
+      animation: caret-blink 1.2s steps(2, end) infinite;
+    }
+    @keyframes caret-blink { 50% { opacity: 0.3; } }
+    .head .version {
+      font: 500 10px/1 'JetBrains Mono', monospace;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+    }
+    .user-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 9px 12px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      margin-bottom: 12px;
+      font-size: 12px;
+    }
+    .user-row .label {
+      color: var(--muted);
+      font: 500 10px/1 'JetBrains Mono', monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .user-badge {
+      font-family: 'JetBrains Mono', ui-monospace, monospace;
+      font-size: 11px;
+      color: var(--accent);
+      font-weight: 600;
+      margin-left: 8px;
+    }
+    .user-switch {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      font: 500 10px/1 'JetBrains Mono', monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+      cursor: pointer;
+      padding: 4px 8px;
+      border-radius: 3px;
+    }
+    .user-switch:hover {
+      color: var(--accent);
+      border-color: var(--accent-dim);
+    }
+    textarea {
+      width: 100%;
+      min-height: 84px;
+      padding: 12px 14px;
+      background: var(--surface);
+      color: var(--ink);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      font: 13px/1.5 'Inter', sans-serif;
+      resize: vertical;
+    }
+    textarea::placeholder { color: var(--muted); }
+    textarea:focus {
+      outline: none;
+      border-color: var(--accent-dim);
+    }
+    .actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 10px;
+    }
+    button.primary {
+      flex: 1;
+      padding: 11px 14px;
+      background: var(--accent);
+      color: var(--bg);
+      border: none;
+      border-radius: 4px;
+      font: 600 12px/1 'JetBrains Mono', monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      cursor: pointer;
+    }
+    button.primary:hover { background: var(--accent-warm); }
+    button.primary:disabled { opacity: 0.4; cursor: wait; }
+    button.secondary {
+      width: 38px;
+      padding: 0;
+      background: var(--surface);
+      color: var(--muted);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 16px;
+    }
+    button.secondary:hover {
+      color: var(--accent);
+      border-color: var(--accent-dim);
+    }
+    .status {
+      margin-top: 12px;
+      padding: 10px 12px;
+      font: 11px/1.5 'JetBrains Mono', monospace;
+      color: var(--muted);
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-left: 2px solid var(--border);
+      border-radius: 3px;
+      min-height: 38px;
+    }
+    .status.hit {
+      color: var(--accent);
+      border-left-color: var(--accent);
+    }
+    .status.err {
+      color: #FF6B6B;
+      border-left-color: #FF6B6B;
+    }
+    a.options {
+      display: block;
+      margin-top: 10px;
+      text-align: right;
+      color: var(--muted);
+      font: 500 10px/1 'JetBrains Mono', monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      text-decoration: none;
+    }
+    a.options:hover { color: var(--accent); }
+  </style>
+</head>
+<body>
+  <div class="head">
+    <div class="brand">evernav<span class="caret"></span></div>
+    <span class="version">v0.1.0</span>
+  </div>
+
+  <div class="user-row">
+    <span><span class="label">ACTIVE</span><span class="user-badge" id="userBadge">demo_user_1</span></span>
+    <button class="user-switch" id="switchUser">switch</button>
+  </div>
+
+  <textarea
+    id="task"
+    placeholder="What do you want to do? e.g. rotate my personal access token"
+    autofocus
+  ></textarea>
+
+  <div class="actions">
+    <button class="primary" id="go">Guide me</button>
+    <button class="secondary" id="stop" title="Stop guidance">×</button>
+  </div>
+
+  <div class="status" id="status">Ready.</div>
+
+  <a class="options" href="#" id="openOptions">→ API keys</a>
+
+  <script src="popup.js"></script>
+</body>
+</html>
