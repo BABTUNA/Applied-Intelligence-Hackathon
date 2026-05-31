@@ -137,10 +137,10 @@ export default function Home() {
         </div>
         <h1>Web UIs are hostile. EverNav shows you exactly where to click.</h1>
         <p>
-          A Chrome extension that watches the active tab and walks you through complex flows —
-          rotate a token, configure a webhook, change a setting — one glowing step at a time.
-          Every completed task is logged to <code>insforge</code> in real time so the next
-          agent picks up where this one left off.
+          A Chrome extension that watches the active tab and walks you through complex flows
+          like rotating a token, configuring a webhook, or changing a setting, one glowing
+          step at a time. Every completed task is logged to <code>insforge</code> in real
+          time so the next agent picks up where this one left off.
         </p>
       </section>
 
