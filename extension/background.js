@@ -299,38 +299,36 @@ function parseVisionJson(text) {
 // (Evermind integration removed for the Applied Intelligence branch — today's
 // stack is Anthropic + InsForge only.)
 
-// InsForge PostgREST: POST {oss_host}/api/rest/v1/sessions with the row body
-// as JSON, authenticated as the anon role. RLS policy 'anon_insert_sessions'
-// allows the write; service-key bypass not needed for hackathon scope.
+// InsForge edge function `log-session`: validates, classifies the task via
+// the InsForge AI gateway (OpenRouter → Claude Haiku), then inserts into the
+// `sessions` table. The Postgres trigger fans the new row out to subscribed
+// dashboard clients via realtime. Touching 4 InsForge surfaces in one call.
 async function insforgeLog({ user, site, task, stepCount }) {
   const cfg = await getConfig();
-  if (!cfg.insforgeUrl || !cfg.insforgeAnonKey) {
-    console.warn("[evernav] insforge url/anon key not set — skipping log");
+  if (!cfg.insforgeUrl) {
+    console.warn("[evernav] insforge url not set — skipping log");
     return;
   }
 
-  const url = `${cfg.insforgeUrl.replace(/\/+$/, "")}/api/database/records/sessions`;
+  const url = `${cfg.insforgeUrl.replace(/\/+$/, "")}/functions/log-session`;
   const body = {
     user_id: user,
     site,
     task,
     step_count: stepCount,
-    completed_at: new Date().toISOString(),
   };
 
   try {
     const resp = await fetch(url, {
       method: "POST",
-      headers: {
-        "apikey": cfg.insforgeAnonKey,
-        "Authorization": `Bearer ${cfg.insforgeAnonKey}`,
-        "Content-Type": "application/json",
-        "Prefer": "return=minimal",
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
+    const data = await resp.json().catch(() => null);
     if (!resp.ok) {
-      console.warn("[evernav] insforge log non-2xx:", resp.status, await resp.text());
+      console.warn("[evernav] insforge log non-2xx:", resp.status, data);
+    } else {
+      console.log("[evernav] session logged — category:", data?.category);
     }
   } catch (e) {
     console.warn("[evernav] insforge log failed:", e.message);
