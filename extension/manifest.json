@@ -32,7 +32,9 @@
     {
       "matches": [
         "https://github.com/*",
-        "https://*.amazon.com/*"
+        "https://*.amazon.com/*",
+        "https://console.aws.amazon.com/*",
+        "https://*.console.aws.amazon.com/*"
       ],
       "js": ["content.js"],
       "css": ["overlay.css"],
@@ -45,7 +47,9 @@
       "resources": ["overlay.css"],
       "matches": [
         "https://github.com/*",
-        "https://*.amazon.com/*"
+        "https://*.amazon.com/*",
+        "https://console.aws.amazon.com/*",
+        "https://*.console.aws.amazon.com/*"
       ]
     }
   ]
