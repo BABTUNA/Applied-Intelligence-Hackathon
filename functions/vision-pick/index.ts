@@ -20,7 +20,13 @@ const VISION_SYSTEM_BASE = `You guide users through web UIs.
 
 You will receive a screenshot of the user's current browser tab and a JSON
 list of interactive elements visible in the viewport. Each element has an
-\`idx\`, \`tag\`, \`text\`, \`aria\`, \`testid\`, \`role\`, and \`bbox\`.
+\`idx\`, \`tag\`, \`text\`, \`aria\`, \`testid\`, \`role\`, \`fid\` (fingerprint), and \`bbox\`.
+
+The \`fid\` field is a stable element fingerprint that survives DOM reshuffles.
+It uses one of these formats:
+- \`tid:<data-testid>\` — from the element's data-testid attribute
+- \`id:<stable-id>\` — from a stable HTML id
+- \`fp:<tag>:<aria-or-text-and-role>\` — computed from tag + attributes
 
 Pick the single next element the user should click to make progress on
 their stated task. Prefer elements whose \`text\` or \`aria\` matches the
@@ -28,16 +34,17 @@ task intent. The screenshot is only the visible viewport — if the task
 requires off-screen content, pick an element that will scroll there.
 
 RESPONSE FORMAT — you MUST return ONLY a JSON object, no prose, no markdown:
-{"idx": <number>, "instruction": "<one short imperative sentence>", "done": <boolean>}
+{"idx": <number>, "fid": "<fingerprint string or null>", "instruction": "<one short imperative sentence>", "done": <boolean>}
 
 If the task already appears complete, OR no element on the page is a
 useful next step, return:
-{"idx": -1, "instruction": "Task complete.", "done": true}
+{"idx": -1, "fid": null, "instruction": "Task complete.", "done": true}
 
 Never reply in English. Never explain. Always return JSON.`;
 
 interface VisionPick {
   idx: number;
+  fid: string | null;
   instruction: string;
   done: boolean;
 }
@@ -51,6 +58,7 @@ function parseVisionJson(text: string): VisionPick {
       if (typeof parsed.idx === "number") {
         return {
           idx: parsed.idx,
+          fid: typeof parsed.fid === "string" ? parsed.fid : null,
           instruction: typeof parsed.instruction === "string" ? parsed.instruction : "Click this.",
           done: typeof parsed.done === "boolean" ? parsed.done : false,
         };
@@ -67,7 +75,7 @@ function parseVisionJson(text: string): VisionPick {
     "this page does not", "this page doesn't",
   ];
   if (doneSignals.some((s) => lower.includes(s))) {
-    return { idx: -1, done: true, instruction: "Task complete." };
+    return { idx: -1, fid: null, done: true, instruction: "Task complete." };
   }
 
   throw new Error(`vision returned non-JSON: ${text.slice(0, 160)}`);

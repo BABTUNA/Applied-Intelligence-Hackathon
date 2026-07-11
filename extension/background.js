@@ -66,7 +66,13 @@ const VISION_SYSTEM = `You guide users through web UIs.
 
 You will receive a screenshot of the user's current browser tab and a JSON
 list of interactive elements visible in the viewport. Each element has an
-\`idx\`, \`tag\`, \`text\`, \`aria\`, \`testid\`, \`role\`, and \`bbox\`.
+\`idx\`, \`tag\`, \`text\`, \`aria\`, \`testid\`, \`role\`, \`fid\` (fingerprint), and \`bbox\`.
+
+The \`fid\` field is a stable element fingerprint that survives DOM reshuffles.
+It uses one of these formats:
+- \`tid:<data-testid>\` — from the element's data-testid attribute
+- \`id:<stable-id>\` — from a stable HTML id
+- \`fp:<tag>:<aria-or-text-and-role>\` — computed from tag + attributes
 
 Pick the single next element the user should click to make progress on
 their stated task. Prefer elements whose \`text\` or \`aria\` matches the
@@ -74,11 +80,11 @@ task intent. The screenshot is only the visible viewport — if the task
 requires off-screen content, pick an element that will scroll there.
 
 RESPONSE FORMAT — you MUST return ONLY a JSON object, no prose, no markdown:
-{"idx": <number>, "instruction": "<one short imperative sentence>", "done": <boolean>}
+{"idx": <number>, "fid": "<fingerprint string or null>", "instruction": "<one short imperative sentence>", "done": <boolean>}
 
 If the task already appears complete, OR no element on the page is a
 useful next step, return:
-{"idx": -1, "instruction": "Task complete.", "done": true}
+{"idx": -1, "fid": null, "instruction": "Task complete.", "done": true}
 
 Never reply in English. Never explain. Always return JSON.`;
 
@@ -401,6 +407,7 @@ async function callVision({ screenshotB64, elements, task, siteHints, insforgeUr
   if (typeof data?.idx !== "number") throw new Error("vision-pick returned no idx");
   return {
     idx: data.idx,
+    fid: typeof data.fid === "string" ? data.fid : null,
     instruction: typeof data.instruction === "string" ? data.instruction : "Click this.",
     done: typeof data.done === "boolean" ? data.done : false,
   };
@@ -632,7 +639,7 @@ async function requestNextLiveStep() {
 
   // 5) Highlight the chosen element — pass both fid and idx for fingerprint-first resolution.
   const chosenElement = elements.find((e) => e.idx === pick.idx);
-  const fid = chosenElement?.fid || null;
+  const fid = pick.fid || chosenElement?.fid || null;
   await dispatchToContent(st.tabId, {
     type: "HIGHLIGHT_INDEX",
     idx: pick.idx,
