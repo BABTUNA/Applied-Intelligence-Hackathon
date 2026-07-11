@@ -8,11 +8,24 @@
 
 import OpenAI from "npm:openai";
 
-const cors = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization, apikey",
-};
+const ALLOWED_ORIGINS = [
+  /^chrome-extension:\/\//,
+  /^https?:\/\/localhost(:\d+)?$/,
+  /^https:\/\/.*\.insforge\.site$/,
+  /^https:\/\/.*\.insforge\.app$/,
+];
+
+const DEFAULT_ORIGIN = "https://uqi28a23.insforge.site";
+
+function corsHeaders(req: Request): Record<string, string> {
+  const origin = req.headers.get("Origin") || "";
+  const allowed = ALLOWED_ORIGINS.some((re) => re.test(origin));
+  return {
+    "Access-Control-Allow-Origin": allowed ? origin : DEFAULT_ORIGIN,
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization, apikey",
+  };
+}
 
 const VISION_MODEL = "anthropic/claude-sonnet-4.6";
 
@@ -82,11 +95,11 @@ function parseVisionJson(text: string): VisionPick {
 }
 
 export default async function (req: Request): Promise<Response> {
-  if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
+  if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders(req) });
   if (req.method !== "POST") {
     return new Response(JSON.stringify({ error: "method not allowed" }), {
       status: 405,
-      headers: { ...cors, "Content-Type": "application/json" },
+      headers: { ...corsHeaders(req), "Content-Type": "application/json" },
     });
   }
 
@@ -94,7 +107,7 @@ export default async function (req: Request): Promise<Response> {
   if (!apiKey) {
     return new Response(JSON.stringify({ error: "OPENROUTER_API_KEY not configured" }), {
       status: 500,
-      headers: { ...cors, "Content-Type": "application/json" },
+      headers: { ...corsHeaders(req), "Content-Type": "application/json" },
     });
   }
 
@@ -104,7 +117,7 @@ export default async function (req: Request): Promise<Response> {
   } catch {
     return new Response(JSON.stringify({ error: "invalid json body" }), {
       status: 400,
-      headers: { ...cors, "Content-Type": "application/json" },
+      headers: { ...corsHeaders(req), "Content-Type": "application/json" },
     });
   }
 
@@ -112,7 +125,7 @@ export default async function (req: Request): Promise<Response> {
   if (!screenshot_b64 || !Array.isArray(elements) || !task) {
     return new Response(
       JSON.stringify({ error: "missing required: screenshot_b64, elements[], task" }),
-      { status: 400, headers: { ...cors, "Content-Type": "application/json" } }
+      { status: 400, headers: { ...corsHeaders(req), "Content-Type": "application/json" } }
     );
   }
 
@@ -177,14 +190,14 @@ export default async function (req: Request): Promise<Response> {
 
     return new Response(JSON.stringify(pick), {
       status: 200,
-      headers: { ...cors, "Content-Type": "application/json" },
+      headers: { ...corsHeaders(req), "Content-Type": "application/json" },
     });
   } catch (e) {
     const err = e as Error;
     console.error("[vision-pick] error:", err.message);
     return new Response(JSON.stringify({ error: err.message || "vision failed" }), {
       status: 500,
-      headers: { ...cors, "Content-Type": "application/json" },
+      headers: { ...corsHeaders(req), "Content-Type": "application/json" },
     });
   }
 }

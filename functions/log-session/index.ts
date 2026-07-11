@@ -14,11 +14,24 @@
 import { createClient } from "npm:@insforge/sdk";
 import OpenAI from "npm:openai";
 
-const cors = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization, apikey",
-};
+const ALLOWED_ORIGINS = [
+  /^chrome-extension:\/\//,
+  /^https?:\/\/localhost(:\d+)?$/,
+  /^https:\/\/.*\.insforge\.site$/,
+  /^https:\/\/.*\.insforge\.app$/,
+];
+
+const DEFAULT_ORIGIN = "https://uqi28a23.insforge.site";
+
+function corsHeaders(req: Request): Record<string, string> {
+  const origin = req.headers.get("Origin") || "";
+  const allowed = ALLOWED_ORIGINS.some((re) => re.test(origin));
+  return {
+    "Access-Control-Allow-Origin": allowed ? origin : DEFAULT_ORIGIN,
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization, apikey",
+  };
+}
 
 const VALID_CATEGORIES = ["security", "navigation", "configuration", "other"];
 
@@ -65,11 +78,11 @@ async function classifyTask(task: string, site: string): Promise<string> {
 }
 
 export default async function (req: Request): Promise<Response> {
-  if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
+  if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders(req) });
   if (req.method !== "POST") {
     return new Response(JSON.stringify({ error: "method not allowed" }), {
       status: 405,
-      headers: { ...cors, "Content-Type": "application/json" },
+      headers: { ...corsHeaders(req), "Content-Type": "application/json" },
     });
   }
 
@@ -79,7 +92,7 @@ export default async function (req: Request): Promise<Response> {
   } catch {
     return new Response(JSON.stringify({ error: "invalid json body" }), {
       status: 400,
-      headers: { ...cors, "Content-Type": "application/json" },
+      headers: { ...corsHeaders(req), "Content-Type": "application/json" },
     });
   }
 
@@ -87,7 +100,7 @@ export default async function (req: Request): Promise<Response> {
   if (!user_id || !site || !task) {
     return new Response(
       JSON.stringify({ error: "missing required field: user_id, site, task" }),
-      { status: 400, headers: { ...cors, "Content-Type": "application/json" } }
+      { status: 400, headers: { ...corsHeaders(req), "Content-Type": "application/json" } }
     );
   }
 
@@ -120,12 +133,12 @@ export default async function (req: Request): Promise<Response> {
     console.error("[log-session] insert error:", error);
     return new Response(JSON.stringify({ error: error.message || "insert failed" }), {
       status: 500,
-      headers: { ...cors, "Content-Type": "application/json" },
+      headers: { ...corsHeaders(req), "Content-Type": "application/json" },
     });
   }
 
   return new Response(
     JSON.stringify({ ok: true, category, session: Array.isArray(data) ? data[0] : data }),
-    { status: 200, headers: { ...cors, "Content-Type": "application/json" } }
+    { status: 200, headers: { ...corsHeaders(req), "Content-Type": "application/json" } }
   );
 }
