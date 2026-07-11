@@ -641,6 +641,15 @@ footer {
   letter-spacing: 0.7px;
 }
 
+.ticker-outcome {
+  padding: 3px 8px;
+  border: 1px solid;
+  border-radius: 2px;
+  font: 600 9.5px/1 var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
 .ticker-steps {
   color: var(--muted);
   font-size: 10.5px;

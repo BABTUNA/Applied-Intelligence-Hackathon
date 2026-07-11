@@ -36,14 +36,30 @@ async function fetchSessions() {
   return data?.rows || data?.data || [];
 }
 
+const OUTCOME_TINT = {
+  completed: { fg: "#4ADE80", bg: "rgba(74,222,128,0.10)", border: "rgba(74,222,128,0.45)", label: "ok" },
+  stopped:   { fg: "#FBBF24", bg: "rgba(251,191,36,0.10)", border: "rgba(251,191,36,0.45)", label: "stopped" },
+  error:     { fg: "#F87171", bg: "rgba(248,113,113,0.10)", border: "rgba(248,113,113,0.45)", label: "error" },
+  max_steps: { fg: "#F87171", bg: "rgba(248,113,113,0.10)", border: "rgba(248,113,113,0.45)", label: "max steps" },
+  unknown:   { fg: "#9CA3AF", bg: "rgba(156,163,175,0.06)", border: "rgba(156,163,175,0.3)", label: "unknown" },
+};
+
 function deriveCounts(rows) {
   const users = new Set();
   const skills = new Set();
+  let completedCount = 0;
+  let knownCount = 0;
   for (const r of rows) {
     if (r.user_id) users.add(r.user_id);
     if (r.site && r.task) skills.add(`${r.site}::${r.task}`);
+    const o = (r.outcome || "").toLowerCase();
+    if (o && o !== "unknown") {
+      knownCount++;
+      if (o === "completed") completedCount++;
+    }
   }
-  return { sessions: rows.length, users: users.size, skills: skills.size };
+  const successRate = knownCount > 0 ? Math.round((completedCount / knownCount) * 100) : null;
+  return { sessions: rows.length, users: users.size, skills: skills.size, successRate };
 }
 
 function formatRelative(iso) {
@@ -59,7 +75,7 @@ function formatRelative(iso) {
 }
 
 export default function Home() {
-  const [counts, setCounts] = useState({ sessions: 0, users: 0, skills: 0 });
+  const [counts, setCounts] = useState({ sessions: 0, users: 0, skills: 0, successRate: null });
   const [recent, setRecent] = useState([]);
   const [state, setState] = useState("loading");
   const [pulse, setPulse] = useState(0);
@@ -231,6 +247,10 @@ export default function Home() {
           <span className="label">Sessions logged</span>
           <span className="num">{display(counts.sessions)}</span>
         </div>
+        <div key={`sr-${pulse}`} className={flashClass}>
+          <span className="label">Success rate</span>
+          <span className="num">{display(counts.successRate !== null ? `${counts.successRate}%` : "—")}</span>
+        </div>
       </section>
 
       {/* Recent sessions ticker */}
@@ -245,6 +265,8 @@ export default function Home() {
         {recent.slice(0, 6).map((r, i) => {
           const cat = (r.category || "other").toLowerCase();
           const tint = CATEGORY_TINT[cat] || CATEGORY_TINT.other;
+          const outcome = (r.outcome || "unknown").toLowerCase();
+          const oTint = OUTCOME_TINT[outcome] || OUTCOME_TINT.unknown;
           const isFresh = i === 0 && pulse > 0;
           return (
             <div className={`ticker-row${isFresh ? " fresh" : ""}`} key={r.id || i}>
@@ -258,6 +280,12 @@ export default function Home() {
                 style={{ color: tint.fg, background: tint.bg, borderColor: tint.border }}
               >
                 {cat}
+              </span>
+              <span
+                className="ticker-outcome"
+                style={{ color: oTint.fg, background: oTint.bg, borderColor: oTint.border }}
+              >
+                {oTint.label}
               </span>
               <span className="ticker-steps">{r.step_count}↻</span>
               <span className="ticker-time">{r.completed_at ? formatRelative(r.completed_at) : ""}</span>
