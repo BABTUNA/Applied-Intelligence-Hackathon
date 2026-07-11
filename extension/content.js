@@ -376,6 +376,52 @@ function advanceReplay() {
   }, 300);
 }
 
+// ─── DOM stability detection ──────────────────────────────────────────────────
+//
+// Replaces a hardcoded 1500ms wait with a signal-based mechanism.
+// The background script sends WAIT_FOR_SETTLED and gets a promise that
+// resolves when the DOM has been quiet for SETTLE_DEBOUNCE ms.
+
+const DomStabilityMonitor = {
+  SETTLE_DEBOUNCE: 400,   // ms of DOM quiet before "settled"
+  HARD_TIMEOUT: 5000,     // ms max wait regardless of mutations
+  _settled: true,
+  _timer: null,
+  _hardTimer: null,
+  _pendingResolves: [],
+  _bodyChildCount: 0,
+
+  onMutation() {
+    this._settled = false;
+    clearTimeout(this._timer);
+    this._timer = setTimeout(() => this._onSettle(), this.SETTLE_DEBOUNCE);
+  },
+
+  _onSettle() {
+    this._settled = true;
+    clearTimeout(this._hardTimer);
+    this._hardTimer = null;
+    const resolves = this._pendingResolves.splice(0);
+    for (const r of resolves) r();
+  },
+
+  waitForSettled() {
+    if (this._settled) return Promise.resolve();
+    return new Promise((resolve) => {
+      this._pendingResolves.push(resolve);
+      // Hard timeout: don't wait forever.
+      if (!this._hardTimer) {
+        this._hardTimer = setTimeout(() => {
+          this._onSettle();
+        }, this.HARD_TIMEOUT);
+      }
+    });
+  },
+};
+
+// Initialize body child count.
+DomStabilityMonitor._bodyChildCount = document.body ? document.body.children.length : 0;
+
 // ─── turbo + mutation handling ────────────────────────────────────────────────
 //
 // GitHub uses Turbo (turbo:load, turbo:render, turbo:frame-load) to swap DOM
@@ -392,12 +438,14 @@ function onPageReshape() {
 
 ["turbo:load", "turbo:render", "turbo:frame-load", "turbo:visit"].forEach((evt) => {
   document.addEventListener(evt, () => {
+    DomStabilityMonitor.onMutation();
     // Wait a beat for the new DOM to actually be present.
     setTimeout(onPageReshape, 100);
   });
 });
 
 const mo = new MutationObserver(() => {
+  DomStabilityMonitor.onMutation();
   if (overlayState) onPageReshape();
 });
 mo.observe(document.documentElement, { childList: true, subtree: true });
@@ -423,6 +471,11 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           const el = resolveIndex(msg.idx);
           const drawn = renderOverlay(el, msg.instruction, { stepIndex: msg.stepIndex });
           sendResponse({ ok: drawn, found: !!el });
+          break;
+        }
+        case "WAIT_FOR_SETTLED": {
+          await DomStabilityMonitor.waitForSettled();
+          sendResponse({ ok: true, settled: true });
           break;
         }
         case "CLEAR_OVERLAY": {
