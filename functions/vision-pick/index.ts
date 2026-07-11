@@ -108,13 +108,16 @@ export default async function (req: Request): Promise<Response> {
     });
   }
 
-  const { screenshot_b64, elements, task, site_hints } = body || {};
+  const { screenshot_b64, elements, task, site_hints, step_history } = body || {};
   if (!screenshot_b64 || !Array.isArray(elements) || !task) {
     return new Response(
       JSON.stringify({ error: "missing required: screenshot_b64, elements[], task" }),
       { status: 400, headers: { ...cors, "Content-Type": "application/json" } }
     );
   }
+
+  // Validate and cap step history
+  const history: any[] = Array.isArray(step_history) ? step_history.slice(0, 10) : [];
 
   const systemPrompt = site_hints
     ? `${VISION_SYSTEM_BASE}\n\n---\n\n${site_hints}`
@@ -130,25 +133,43 @@ export default async function (req: Request): Promise<Response> {
       },
     });
 
-    const completion = await client.chat.completions.create({
-      model: VISION_MODEL,
-      max_tokens: 256,
-      messages: [
-        { role: "system", content: systemPrompt },
+    // Build messages array — include step history as prior context if available.
+    const messages: any[] = [{ role: "system", content: systemPrompt }];
+
+    if (history.length > 0) {
+      const stepLines = history.map((s: any, i: number) => {
+        const fid = s.fid ? ` [fid: ${s.fid}]` : "";
+        const el = s.elementText ? ` on "${s.elementText}"` : "";
+        return `Step ${i + 1}: ${s.instruction || "click"}${el}${fid}`;
+      });
+      messages.push({
+        role: "user",
+        content: `Previous steps completed for this task:\n${stepLines.join("\n")}\n\nDo NOT repeat any step above. Pick the NEXT action.`,
+      });
+      messages.push({
+        role: "assistant",
+        content: `Understood. I will pick the next action that has not been done yet.`,
+      });
+    }
+
+    messages.push({
+      role: "user",
+      content: [
         {
-          role: "user",
-          content: [
-            {
-              type: "image_url",
-              image_url: { url: `data:image/jpeg;base64,${screenshot_b64}` },
-            } as any,
-            {
-              type: "text",
-              text: `Task: ${task}\n\nElements (JSON):\n${JSON.stringify(elements)}`,
-            },
-          ],
+          type: "image_url",
+          image_url: { url: `data:image/jpeg;base64,${screenshot_b64}` },
+        } as any,
+        {
+          type: "text",
+          text: `Task: ${task}\n\nElements (JSON):\n${JSON.stringify(elements)}`,
         },
       ],
+    });
+
+    const completion = await client.chat.completions.create({
+      model: VISION_MODEL,
+      max_tokens: 300,
+      messages,
     });
 
     const text = completion.choices?.[0]?.message?.content || "";

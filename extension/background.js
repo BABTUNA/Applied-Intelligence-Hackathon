@@ -382,7 +382,7 @@ function siteHintsFor(url) {
 // proxies to OpenRouter (via the InsForge AI Gateway) and returns clean
 // {idx, instruction, done}. The Anthropic API key never leaves the server —
 // the extension only ever knows the InsForge URL.
-async function callVision({ screenshotB64, elements, task, siteHints, insforgeUrl }) {
+async function callVision({ screenshotB64, elements, task, siteHints, insforgeUrl, stepHistory }) {
   if (!insforgeUrl) throw new Error("insforge url not configured");
 
   const url = `${insforgeUrl.replace(/\/+$/, "")}/functions/vision-pick`;
@@ -394,6 +394,7 @@ async function callVision({ screenshotB64, elements, task, siteHints, insforgeUr
       elements,
       task,
       site_hints: siteHints || null,
+      step_history: Array.isArray(stepHistory) && stepHistory.length > 0 ? stepHistory : undefined,
     }),
   });
 
@@ -618,6 +619,7 @@ async function requestNextLiveStep() {
       task: st.task,
       siteHints: siteHintsFor(tabMeta.url),
       insforgeUrl: cfg.insforgeUrl,
+      stepHistory: st.stepHistory || [],
     });
   } catch (e) {
     console.error("[evernav] vision call failed:", e);
