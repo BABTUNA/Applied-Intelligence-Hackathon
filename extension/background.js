@@ -462,7 +462,7 @@ function parseVisionJson(text) {
 // the InsForge AI gateway (OpenRouter → Claude Haiku), then inserts into the
 // `sessions` table. The Postgres trigger fans the new row out to subscribed
 // dashboard clients via realtime. Touching 4 InsForge surfaces in one call.
-async function insforgeLog({ user, site, task, stepCount }) {
+async function insforgeLog({ user, site, task, stepCount, stepSummary }) {
   const cfg = await getConfig();
   if (!cfg.insforgeUrl) {
     console.warn("[evernav] insforge url not set — skipping log");
@@ -475,6 +475,7 @@ async function insforgeLog({ user, site, task, stepCount }) {
     site,
     task,
     step_count: stepCount,
+    step_summary: Array.isArray(stepSummary) ? stepSummary.slice(0, 15) : undefined,
   };
 
   try {
@@ -711,11 +712,16 @@ async function onStepCompleted({ stepIndex, target }) {
 
   // If this was the final step (vision returned done:true earlier), log + close.
   if (st.taskDone) {
+    const stepSummary = (st.stepHistory || []).map((s) => ({
+      instruction: s.instruction,
+      element: s.elementText || null,
+    }));
     await insforgeLog({
       user: st.user,
       site: st.site,
       task: st.task,
       stepCount: trail.length,
+      stepSummary,
     });
     await stopGuidance({ tabId: st.tabId });
   } else if (st.source === "live") {

@@ -83,7 +83,7 @@ export default async function (req: Request): Promise<Response> {
     });
   }
 
-  const { user_id, site, task, step_count } = body || {};
+  const { user_id, site, task, step_count, step_summary } = body || {};
   if (!user_id || !site || !task) {
     return new Response(
       JSON.stringify({ error: "missing required field: user_id, site, task" }),
@@ -99,7 +99,10 @@ export default async function (req: Request): Promise<Response> {
     anonKey: Deno.env.get("ANON_KEY"),
   });
 
-  const row = {
+  // Validate and cap step summary
+  const validSummary = Array.isArray(step_summary) ? step_summary.slice(0, 15) : null;
+
+  const row: Record<string, any> = {
     user_id: String(user_id),
     site: String(site),
     task: String(task),
@@ -107,6 +110,9 @@ export default async function (req: Request): Promise<Response> {
     category,
     completed_at: new Date().toISOString(),
   };
+  if (validSummary) {
+    row.step_summary = JSON.stringify(validSummary);
+  }
 
   const { data, error } = await client.database.from("sessions").insert([row]);
 
