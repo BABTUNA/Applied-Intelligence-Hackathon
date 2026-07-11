@@ -525,9 +525,19 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         }
         case "HIGHLIGHT_INDEX": {
           hideThinking();
-          const el = resolveIndex(msg.idx);
+          // Prefer fingerprint resolution, fall back to positional index.
+          let el = null;
+          let resolvedBy = "none";
+          if (msg.fid) {
+            el = resolveFingerprint(msg.fid);
+            if (el) resolvedBy = "fingerprint";
+          }
+          if (!el && msg.idx != null) {
+            el = resolveIndex(msg.idx);
+            if (el) resolvedBy = "index";
+          }
           const drawn = renderOverlay(el, msg.instruction, { stepIndex: msg.stepIndex });
-          sendResponse({ ok: drawn, found: !!el });
+          sendResponse({ ok: drawn, found: !!el, resolvedBy });
           break;
         }
         case "WAIT_FOR_SETTLED": {

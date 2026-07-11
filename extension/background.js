@@ -630,10 +630,13 @@ async function requestNextLiveStep() {
     return;
   }
 
-  // 5) Highlight the chosen element.
+  // 5) Highlight the chosen element — pass both fid and idx for fingerprint-first resolution.
+  const chosenElement = elements.find((e) => e.idx === pick.idx);
+  const fid = chosenElement?.fid || null;
   await dispatchToContent(st.tabId, {
     type: "HIGHLIGHT_INDEX",
     idx: pick.idx,
+    fid,
     instruction: pick.instruction,
     stepIndex: st.step,
   });
