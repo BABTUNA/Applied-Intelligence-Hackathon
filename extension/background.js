@@ -501,6 +501,7 @@ async function startGuidance({ task, user, tabId, url }) {
   await setState({
     task, user, site, tabId,
     trail: [], step: 0, status: "active", source: "live",
+    stepHistory: [],
   });
   // Persistent control bar — the popup vanishes the moment the user clicks
   // anywhere outside it, so we need a Stop button that lives on the page.
@@ -637,8 +638,20 @@ async function requestNextLiveStep() {
     return;
   }
 
-  // 5) Highlight the chosen element — pass both fid and idx for fingerprint-first resolution.
+  // Build step record for history
   const chosenElement = elements.find((e) => e.idx === pick.idx);
+  const stepRecord = {
+    stepIndex: st.step,
+    instruction: pick.instruction,
+    fid: pick.fid || chosenElement?.fid || null,
+    elementText: chosenElement?.text || "",
+    pageUrl: tabMeta.url,
+    timestamp: Date.now(),
+  };
+  const updatedHistory = [...(st.stepHistory || []), stepRecord].slice(-10);
+  await setState({ stepHistory: updatedHistory });
+
+  // 5) Highlight the chosen element — pass both fid and idx for fingerprint-first resolution.
   const fid = pick.fid || chosenElement?.fid || null;
   await dispatchToContent(st.tabId, {
     type: "HIGHLIGHT_INDEX",
@@ -740,6 +753,7 @@ async function demoForceReplay(userOverride) {
     step: 0,
     status: "active",
     source: "fallback",
+    stepHistory: [],
   });
   await dispatchToContent(tab.id, { type: "REPLAY_TRAIL", trail: fb.trail });
 }
