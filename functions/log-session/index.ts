@@ -130,7 +130,7 @@ export default async function (req: Request): Promise<Response> {
     });
   }
 
-  const { user_id, site, task, step_count, step_summary } = body || {};
+  const { user_id, site, task, step_count, step_summary, outcome, outcome_reason } = body || {};
   if (!user_id || !site || !task) {
     return new Response(
       JSON.stringify({ error: "missing required field: user_id, site, task" }),
@@ -182,6 +182,14 @@ export default async function (req: Request): Promise<Response> {
   };
   if (validSummary) {
     row.step_summary = JSON.stringify(validSummary);
+  }
+
+  // Outcome tracking
+  const VALID_OUTCOMES = ["completed", "stopped", "error", "max_steps", "unknown"];
+  const sOutcome = typeof outcome === "string" && VALID_OUTCOMES.includes(outcome) ? outcome : "unknown";
+  row.outcome = sOutcome;
+  if (typeof outcome_reason === "string" && outcome_reason.length > 0) {
+    row.outcome_reason = outcome_reason.slice(0, 500);
   }
 
   const { data, error } = await client.database.from("sessions").insert([row]);

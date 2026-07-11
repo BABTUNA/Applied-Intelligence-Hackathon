@@ -221,7 +221,7 @@ function parseVisionJson(text) {
 // the InsForge AI gateway (OpenRouter → Claude Haiku), then inserts into the
 // `sessions` table. The Postgres trigger fans the new row out to subscribed
 // dashboard clients via realtime. Touching 4 InsForge surfaces in one call.
-async function insforgeLog({ user, site, task, stepCount, stepSummary }) {
+async function insforgeLog({ user, site, task, stepCount, stepSummary, outcome, outcomeReason }) {
   const cfg = await getConfig();
   if (!cfg.insforgeUrl) {
     console.warn("[evernav] insforge url not set — skipping log");
@@ -235,6 +235,8 @@ async function insforgeLog({ user, site, task, stepCount, stepSummary }) {
     task,
     step_count: stepCount,
     step_summary: Array.isArray(stepSummary) ? stepSummary.slice(0, 15) : undefined,
+    outcome: outcome || "unknown",
+    outcome_reason: outcomeReason || undefined,
   };
 
   try {
@@ -294,7 +296,24 @@ async function startGuidance({ task, user, tabId, url }) {
   return { ok: true, cacheHit: false, steps: null };
 }
 
-async function stopGuidance({ tabId }) {
+async function stopGuidance({ tabId, outcome, outcomeReason }) {
+  const st = await getState();
+  // Log session if we have an active task
+  if (st && st.task && outcome) {
+    const stepSummary = (st.stepHistory || []).map((s) => ({
+      instruction: s.instruction,
+      element: s.elementText || null,
+    }));
+    await insforgeLog({
+      user: st.user,
+      site: st.site,
+      task: st.task,
+      stepCount: st.step || 0,
+      stepSummary,
+      outcome,
+      outcomeReason,
+    });
+  }
   await dispatchToContent(tabId, { type: "CLEAR_OVERLAY" });
   await dispatchToContent(tabId, { type: "HIDE_THINKING" });
   await dispatchToContent(tabId, { type: "HIDE_CONTROL" });
@@ -316,7 +335,7 @@ async function requestNextLiveStep() {
   // Hard limit — auto-stop after MAX_STEPS to prevent runaway sessions
   if (st.step >= MAX_STEPS) {
     console.warn("[evernav] maximum steps exceeded — stopping guidance");
-    await stopGuidance({ tabId: st.tabId });
+    await stopGuidance({ tabId: st.tabId, outcome: "max_steps", outcomeReason: `exceeded ${MAX_STEPS} steps` });
     return;
   }
 
@@ -366,13 +385,13 @@ async function requestNextLiveStep() {
   } catch (e) {
     console.error("[evernav] target tab disappeared:", e.message);
     await dispatchToContent(st.tabId, { type: "HIDE_THINKING" });
-    await stopGuidance({ tabId: st.tabId });
+    await stopGuidance({ tabId: st.tabId, outcome: "error", outcomeReason: "target tab disappeared" });
     return;
   }
   if (!tabMeta?.url || !/^https?:\/\//i.test(tabMeta.url)) {
     console.error("[evernav] target tab is not a screenshotable URL:", tabMeta?.url);
     await dispatchToContent(st.tabId, { type: "HIDE_THINKING" });
-    await stopGuidance({ tabId: st.tabId });
+    await stopGuidance({ tabId: st.tabId, outcome: "error", outcomeReason: "non-screenshotable URL" });
     return;
   }
   const screenshotDataUrl = await chrome.tabs.captureVisibleTab(tabMeta.windowId, {
@@ -443,7 +462,7 @@ async function requestNextLiveStep() {
     // Fail-safe: stop the session so the pill doesn't get stuck and so
     // we don't keep retrying against a bad page. User can hit Guide me
     // again to restart from the current viewport.
-    await stopGuidance({ tabId: st.tabId });
+    await stopGuidance({ tabId: st.tabId, outcome: "error", outcomeReason: e.message || "vision failed" });
     return;
   }
 
@@ -489,18 +508,7 @@ async function onStepCompleted({ stepIndex, target }) {
 
   // If this was the final step (vision returned done:true earlier), log + close.
   if (st.taskDone) {
-    const stepSummary = (st.stepHistory || []).map((s) => ({
-      instruction: s.instruction,
-      element: s.elementText || null,
-    }));
-    await insforgeLog({
-      user: st.user,
-      site: st.site,
-      task: st.task,
-      stepCount: trail.length,
-      stepSummary,
-    });
-    await stopGuidance({ tabId: st.tabId });
+    await stopGuidance({ tabId: st.tabId, outcome: "completed" });
   } else if (st.source === "live") {
     await requestNextLiveStep();
   }
@@ -600,13 +608,13 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           sendResponse(await startGuidance(msg));
           break;
         case "STOP_GUIDANCE":
-          sendResponse(await stopGuidance(msg));
+          sendResponse(await stopGuidance({ ...msg, outcome: "stopped", outcomeReason: "user_stopped" }));
           break;
         case "STOP_GUIDANCE_FROM_PAGE": {
           // Stop button on the in-page control bar — tabId isn't on the msg,
           // pull it from sender or state.
           const tabId = sender?.tab?.id ?? (await getState())?.tabId;
-          if (tabId != null) await stopGuidance({ tabId });
+          if (tabId != null) await stopGuidance({ tabId, outcome: "stopped", outcomeReason: "user_stopped" });
           sendResponse({ ok: true });
           break;
         }
