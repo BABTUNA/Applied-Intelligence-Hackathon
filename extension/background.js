@@ -494,6 +494,26 @@ async function insforgeLog({ user, site, task, stepCount }) {
   }
 }
 
+// ─── oscillation detection ────────────────────────────────────────────────────
+
+const MAX_STEPS = 15;
+
+function detectOscillation(stepHistory) {
+  if (!Array.isArray(stepHistory) || stepHistory.length < 3) return null;
+  const recent = stepHistory.slice(-4);
+  // Check if same fingerprint appears 2+ times in last 4 steps
+  const fidCounts = {};
+  const instrCounts = {};
+  for (const s of recent) {
+    if (s.fid) fidCounts[s.fid] = (fidCounts[s.fid] || 0) + 1;
+    if (s.instruction) instrCounts[s.instruction] = (instrCounts[s.instruction] || 0) + 1;
+  }
+  const repeatedFids = Object.entries(fidCounts).filter(([, c]) => c >= 2).map(([fid]) => fid);
+  const repeatedInstrs = Object.entries(instrCounts).filter(([, c]) => c >= 2).map(([instr]) => instr);
+  if (repeatedFids.length === 0 && repeatedInstrs.length === 0) return null;
+  return { repeatedFids, repeatedInstrs };
+}
+
 // ─── orchestration ────────────────────────────────────────────────────────────
 
 async function startGuidance({ task, user, tabId, url }) {
@@ -530,6 +550,13 @@ async function requestNextLiveStep() {
   const cfg = await getConfig();
   if (!cfg.insforgeUrl) {
     console.error("[evernav] missing insforge url — set it in options");
+    return;
+  }
+
+  // Hard limit — auto-stop after MAX_STEPS to prevent runaway sessions
+  if (st.step >= MAX_STEPS) {
+    console.warn("[evernav] maximum steps exceeded — stopping guidance");
+    await stopGuidance({ tabId: st.tabId });
     return;
   }
 
@@ -610,14 +637,25 @@ async function requestNextLiveStep() {
   }
   const elements = enumResp.elements;
 
-  // 3) Call vision.
+  // 3) Call vision — inject anti-loop directive if oscillation detected.
+  let hints = siteHintsFor(tabMeta.url);
+  const oscillation = detectOscillation(st.stepHistory || []);
+  if (oscillation) {
+    console.warn("[evernav] oscillation detected:", oscillation);
+    const avoidList = [
+      ...oscillation.repeatedFids.map((f) => `fingerprint ${f}`),
+      ...oscillation.repeatedInstrs.map((i) => `"${i}"`),
+    ];
+    hints += `\n\nWARNING: The agent is oscillating. Do NOT click these recently-repeated elements: ${avoidList.join(", ")}. Pick a DIFFERENT element to make forward progress.`;
+  }
+
   let pick;
   try {
     pick = await callVision({
       screenshotB64,
       elements,
       task: st.task,
-      siteHints: siteHintsFor(tabMeta.url),
+      siteHints: hints,
       insforgeUrl: cfg.insforgeUrl,
       stepHistory: st.stepHistory || [],
     });
