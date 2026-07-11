@@ -27,6 +27,34 @@ function corsHeaders(req: Request): Record<string, string> {
   };
 }
 
+// ─── rate limiting ───────────────────────────────────────────────────────────
+const RATE_LIMIT = 30; // requests per minute
+const RATE_WINDOW = 60_000; // 1 minute
+const RATE_MAX_IPS = 500;
+
+const _rateBuckets: Map<string, number[]> = new Map();
+
+function checkRateLimit(req: Request): boolean {
+  const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim()
+    || req.headers.get("cf-connecting-ip")
+    || "unknown";
+  const now = Date.now();
+  let timestamps = _rateBuckets.get(ip) || [];
+  timestamps = timestamps.filter((t) => now - t < RATE_WINDOW);
+  if (timestamps.length >= RATE_LIMIT) {
+    _rateBuckets.set(ip, timestamps);
+    return false;
+  }
+  timestamps.push(now);
+  _rateBuckets.set(ip, timestamps);
+  // Evict stale IPs
+  if (_rateBuckets.size > RATE_MAX_IPS) {
+    const oldest = _rateBuckets.keys().next().value;
+    if (oldest) _rateBuckets.delete(oldest);
+  }
+  return true;
+}
+
 const VISION_MODEL = "anthropic/claude-sonnet-4.6";
 
 const VISION_SYSTEM_BASE = `You guide users through web UIs.
@@ -100,6 +128,13 @@ export default async function (req: Request): Promise<Response> {
     return new Response(JSON.stringify({ error: "method not allowed" }), {
       status: 405,
       headers: { ...corsHeaders(req), "Content-Type": "application/json" },
+    });
+  }
+
+  if (!checkRateLimit(req)) {
+    return new Response(JSON.stringify({ error: "rate limit exceeded" }), {
+      status: 429,
+      headers: { ...corsHeaders(req), "Content-Type": "application/json", "Retry-After": "60" },
     });
   }
 

@@ -33,6 +33,33 @@ function corsHeaders(req: Request): Record<string, string> {
   };
 }
 
+// ─── rate limiting ───────────────────────────────────────────────────────────
+const RATE_LIMIT = 10; // requests per minute
+const RATE_WINDOW = 60_000;
+const RATE_MAX_IPS = 500;
+
+const _rateBuckets: Map<string, number[]> = new Map();
+
+function checkRateLimit(req: Request): boolean {
+  const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim()
+    || req.headers.get("cf-connecting-ip")
+    || "unknown";
+  const now = Date.now();
+  let timestamps = _rateBuckets.get(ip) || [];
+  timestamps = timestamps.filter((t) => now - t < RATE_WINDOW);
+  if (timestamps.length >= RATE_LIMIT) {
+    _rateBuckets.set(ip, timestamps);
+    return false;
+  }
+  timestamps.push(now);
+  _rateBuckets.set(ip, timestamps);
+  if (_rateBuckets.size > RATE_MAX_IPS) {
+    const oldest = _rateBuckets.keys().next().value;
+    if (oldest) _rateBuckets.delete(oldest);
+  }
+  return true;
+}
+
 const VALID_CATEGORIES = ["security", "navigation", "configuration", "other"];
 
 async function classifyTask(task: string, site: string): Promise<string> {
@@ -83,6 +110,13 @@ export default async function (req: Request): Promise<Response> {
     return new Response(JSON.stringify({ error: "method not allowed" }), {
       status: 405,
       headers: { ...corsHeaders(req), "Content-Type": "application/json" },
+    });
+  }
+
+  if (!checkRateLimit(req)) {
+    return new Response(JSON.stringify({ error: "rate limit exceeded" }), {
+      status: 429,
+      headers: { ...corsHeaders(req), "Content-Type": "application/json", "Retry-After": "60" },
     });
   }
 
