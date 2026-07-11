@@ -344,13 +344,25 @@ function hideControl() {
 
 function scoreMatch(candSig, want) {
   if (!candSig.tag || candSig.tag !== want.tag) return 0;
-  let score = 10;
-  if (want.testid && candSig.testid === want.testid) score += 100;
+  let score = 10; // base tag match
+
+  // data-testid exact match is authoritative
+  if (want.testid && candSig.testid === want.testid) return 200;
+
+  // Exact text match
   if (want.text && candSig.text && candSig.text === want.text) score += 50;
+  // Partial text match (weaker)
+  else if (want.text && candSig.text && candSig.text.includes(want.text)) score += 15;
+  else if (want.text && candSig.text && want.text.includes(candSig.text)) score += 20;
+
+  // Exact aria match
   if (want.aria && candSig.aria && candSig.aria === want.aria) score += 30;
+  // Partial aria match
+  else if (want.aria && candSig.aria && candSig.aria.includes(want.aria)) score += 15;
+
+  // Role match
   if (want.role && candSig.role === want.role) score += 10;
-  // Partial text match as a weak signal.
-  if (want.text && candSig.text && candSig.text.includes(want.text)) score += 15;
+
   return score;
 }
 
@@ -368,7 +380,21 @@ function findElementBySignature(want) {
     }
   }
   // Require at least a tag match + one strong attribute.
-  return bestScore >= 25 ? best : null;
+  return bestScore >= 40 ? best : null;
+}
+
+function findElementByFingerprint(fid) {
+  if (!fid) return null;
+  // First check registry from last buildElementList
+  const cached = fingerprintRegistry.get(fid);
+  if (cached && cached.isConnected && isVisible(cached)) return cached;
+  // Scan the DOM for a fresh match
+  const all = Array.from(document.querySelectorAll(INTERACTIVE_SELECTOR));
+  for (const el of all) {
+    if (!isVisible(el)) continue;
+    if (elementFingerprint(el) === fid) return el;
+  }
+  return null;
 }
 
 // ─── cached-trail replay ──────────────────────────────────────────────────────
