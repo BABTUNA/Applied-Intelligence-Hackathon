@@ -534,7 +534,20 @@ async function requestNextLiveStep() {
   // a stale DOM. Wait, then resend both UI bits in case the prior dispatch
   // hit a dying content script (or the new page hasn't mounted yet).
   if (!firstStep) {
-    await new Promise((r) => setTimeout(r, 1500));
+    // 300ms minimum floor (animation baseline)
+    await new Promise((r) => setTimeout(r, 300));
+
+    // Ask content script to report when DOM is settled
+    try {
+      const settleResp = await dispatchToContent(st.tabId, { type: "WAIT_FOR_SETTLED" });
+      if (!settleResp?.ok) {
+        // Content script is dead (hard nav) — fallback to a sleep
+        await new Promise((r) => setTimeout(r, 1200));
+      }
+    } catch {
+      await new Promise((r) => setTimeout(r, 1200));
+    }
+
     dispatchToContent(st.tabId, { type: "SHOW_THINKING", label: thinkingLabel });
     dispatchToContent(st.tabId, { type: "SHOW_CONTROL", task: st.task });
   }
