@@ -55,6 +55,10 @@ async function getConfig() {
   ]);
 }
 
+// ─── hard navigation tracking ─────────────────────────────────────────────────
+
+let _lastNavAt = 0;
+
 // ─── vendor calls (stubs, filled in later commits) ────────────────────────────
 
 const VISION_MODEL = "claude-sonnet-4-6";
@@ -537,6 +541,11 @@ async function requestNextLiveStep() {
     // 300ms minimum floor (animation baseline)
     await new Promise((r) => setTimeout(r, 300));
 
+    // Add extra buffer if hard nav was detected recently
+    if (Date.now() - _lastNavAt < 2000) {
+      await new Promise((r) => setTimeout(r, 500));
+    }
+
     // Ask content script to report when DOM is settled
     try {
       const settleResp = await dispatchToContent(st.tabId, { type: "WAIT_FOR_SETTLED" });
@@ -756,6 +765,10 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         }
         case "STEP_COMPLETED":
           await onStepCompleted(msg);
+          sendResponse({ ok: true });
+          break;
+        case "PAGE_NAVIGATING":
+          _lastNavAt = Date.now();
           sendResponse({ ok: true });
           break;
         case "DEMO_FORCE_BEAT_1":

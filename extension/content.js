@@ -393,8 +393,16 @@ const DomStabilityMonitor = {
 
   onMutation() {
     this._settled = false;
+
+    // Detect full-page swap: if >50% of body children were removed,
+    // use a longer debounce for the content to stabilize.
+    const currentCount = document.body ? document.body.children.length : 0;
+    const lostMajority = this._bodyChildCount > 0 && currentCount < this._bodyChildCount * 0.5;
+    this._bodyChildCount = currentCount;
+    const debounce = lostMajority ? 800 : this.SETTLE_DEBOUNCE;
+
     clearTimeout(this._timer);
-    this._timer = setTimeout(() => this._onSettle(), this.SETTLE_DEBOUNCE);
+    this._timer = setTimeout(() => this._onSettle(), debounce);
   },
 
   _onSettle() {
@@ -449,6 +457,17 @@ const mo = new MutationObserver(() => {
   if (overlayState) onPageReshape();
 });
 mo.observe(document.documentElement, { childList: true, subtree: true });
+
+// ─── hard navigation detection ────────────────────────────────────────────────
+
+window.addEventListener("beforeunload", () => {
+  // Best-effort signal: content script is about to die.
+  try {
+    chrome.runtime.sendMessage({ type: "PAGE_NAVIGATING" });
+  } catch {
+    // Extension context may already be invalidated — swallow.
+  }
+});
 
 // ─── messaging ────────────────────────────────────────────────────────────────
 
