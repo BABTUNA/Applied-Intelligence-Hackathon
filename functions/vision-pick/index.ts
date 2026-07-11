@@ -164,6 +164,28 @@ export default async function (req: Request): Promise<Response> {
     );
   }
 
+  // Input validation and sanitization
+  const sanitizedTask = String(task).replace(/<[^>]*>/g, "").trim();
+  if (!sanitizedTask || sanitizedTask.length > 500) {
+    return new Response(
+      JSON.stringify({ error: "task must be 1-500 characters (HTML tags stripped)" }),
+      { status: 400, headers: { ...corsHeaders(req), "Content-Type": "application/json" } }
+    );
+  }
+  if (elements.length > 80) {
+    return new Response(
+      JSON.stringify({ error: "elements array exceeds maximum of 80" }),
+      { status: 400, headers: { ...corsHeaders(req), "Content-Type": "application/json" } }
+    );
+  }
+  // ~2.8MB base64 ≈ ~2MB decoded
+  if (typeof screenshot_b64 !== "string" || screenshot_b64.length > 2_800_000) {
+    return new Response(
+      JSON.stringify({ error: "screenshot_b64 exceeds maximum size (~2MB)" }),
+      { status: 400, headers: { ...corsHeaders(req), "Content-Type": "application/json" } }
+    );
+  }
+
   // Validate and cap step history
   const history: any[] = Array.isArray(step_history) ? step_history.slice(0, 10) : [];
 
@@ -209,7 +231,7 @@ export default async function (req: Request): Promise<Response> {
         } as any,
         {
           type: "text",
-          text: `Task: ${task}\n\nElements (JSON):\n${JSON.stringify(elements)}`,
+          text: `Task: ${sanitizedTask}\n\nElements (JSON):\n${JSON.stringify(elements)}`,
         },
       ],
     });

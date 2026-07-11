@@ -138,8 +138,31 @@ export default async function (req: Request): Promise<Response> {
     );
   }
 
+  // Input validation and sanitization
+  const sTask = String(task).replace(/<[^>]*>/g, "").trim();
+  const sUserId = String(user_id).trim();
+  const sSite = String(site).trim();
+  if (!sTask || sTask.length > 500) {
+    return new Response(
+      JSON.stringify({ error: "task must be 1-500 characters" }),
+      { status: 400, headers: { ...corsHeaders(req), "Content-Type": "application/json" } }
+    );
+  }
+  if (!sUserId || sUserId.length > 100) {
+    return new Response(
+      JSON.stringify({ error: "user_id must be 1-100 characters" }),
+      { status: 400, headers: { ...corsHeaders(req), "Content-Type": "application/json" } }
+    );
+  }
+  if (!sSite || sSite.length > 200) {
+    return new Response(
+      JSON.stringify({ error: "site must be 1-200 characters" }),
+      { status: 400, headers: { ...corsHeaders(req), "Content-Type": "application/json" } }
+    );
+  }
+
   // Classify in parallel with nothing else — just await and proceed.
-  const category = await classifyTask(String(task), String(site));
+  const category = await classifyTask(sTask, sSite);
 
   const client = createClient({
     baseUrl: Deno.env.get("INSFORGE_BASE_URL"),
@@ -150,9 +173,9 @@ export default async function (req: Request): Promise<Response> {
   const validSummary = Array.isArray(step_summary) ? step_summary.slice(0, 15) : null;
 
   const row: Record<string, any> = {
-    user_id: String(user_id),
-    site: String(site),
-    task: String(task),
+    user_id: sUserId,
+    site: sSite,
+    task: sTask,
     step_count: Number(step_count) || 0,
     category,
     completed_at: new Date().toISOString(),
