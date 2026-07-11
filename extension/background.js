@@ -117,8 +117,10 @@ function setCachedHints(key, hints) {
   _hintCache.set(key, { hints, ts: Date.now() });
 }
 
+// Returns { hints, reachable } — reachable=false means network error (use static).
+// reachable=true + empty hints means Moss has no hints for this site (don't use static).
 async function fetchMossHints(task, site, insforgeUrl) {
-  if (!insforgeUrl) return null;
+  if (!insforgeUrl) return { hints: "", reachable: false };
   try {
     const url = `${insforgeUrl.replace(/\/+$/, "")}/functions/moss-retrieve`;
     const resp = await fetch(url, {
@@ -126,11 +128,12 @@ async function fetchMossHints(task, site, insforgeUrl) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ query: task, site }),
     });
-    if (!resp.ok) return null;
+    if (!resp.ok) return { hints: "", reachable: false };
     const data = await resp.json();
-    return typeof data?.hints === "string" ? data.hints : null;
+    const hints = typeof data?.hints === "string" ? data.hints : "";
+    return { hints, reachable: true };
   } catch {
-    return null;
+    return { hints: "", reachable: false };
   }
 }
 
@@ -394,20 +397,24 @@ async function requestNextLiveStep() {
   }
   const elements = enumResp.elements;
 
-  // 3) Call vision — resolve hints (Moss cache → Moss fetch → static fallback).
+  // 3) Call vision — resolve hints (Moss cache → Moss fetch → static offline fallback).
+  // Moss is the primary source. Static hints only fire when Moss is completely
+  // unreachable (network error). If Moss is reachable but returns empty, that
+  // means "no hints for this site" — don't fall through to static.
   const hintCacheKey = `${st.site}::${st.task.slice(0, 40)}`;
   let hints = getCachedHints(hintCacheKey);
   if (hints !== null) {
     console.log("[evernav] hints source: cache");
   } else {
-    const mossHints = await fetchMossHints(st.task, st.site, cfg.insforgeUrl);
-    if (mossHints !== null) {
-      hints = mossHints;
+    const mossResult = await fetchMossHints(st.task, st.site, cfg.insforgeUrl);
+    if (mossResult.reachable) {
+      hints = mossResult.hints;
       setCachedHints(hintCacheKey, hints);
-      console.log("[evernav] hints source: moss");
+      console.log("[evernav] hints source: moss", hints ? "(has content)" : "(empty — no hints for site)");
     } else {
+      // Moss unreachable — offline fallback to static hints
       hints = siteHintsFor(tabMeta.url);
-      console.log("[evernav] hints source: static fallback");
+      console.log("[evernav] hints source: static (offline fallback)");
     }
   }
   const oscillation = detectOscillation(st.stepHistory || []);

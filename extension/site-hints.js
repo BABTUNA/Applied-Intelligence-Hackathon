@@ -1,5 +1,7 @@
-// Static site hints — offline fallback for when Moss is unreachable.
-// These will be superseded by Moss semantic retrieval in a later commit.
+// Static site hints — offline-only fallback for when Moss is unreachable.
+// DEPRECATED: Moss semantic retrieval is now the primary hint source.
+// These static hints only fire when the network is down. New hints should
+// be added to fixtures/hint-docs/ and seeded via scripts/seed-moss.js.
 
 export const SITE_HINTS = {
   "claude.ai": `SITE: claude.ai — known navigation traps.
