@@ -21,6 +21,9 @@ const INTERACTIVE_SELECTOR = [
 /** Map<number, Element> — index returned to SW resolves back to a live node here. */
 let elementRegistry = new Map();
 
+/** Map<string, Element> — fingerprint returned to SW resolves back to a live node. */
+let fingerprintRegistry = new Map();
+
 function isVisible(el) {
   const rect = el.getBoundingClientRect();
   if (rect.width < 4 || rect.height < 4) return false;
@@ -63,6 +66,7 @@ function describe(el, idx) {
     text: textOf(el),
     aria: el.getAttribute("aria-label") || undefined,
     testid: el.getAttribute("data-testid") || undefined,
+    fid: elementFingerprint(el) || undefined,
     bbox: [
       Math.round(rect.left),
       Math.round(rect.top),
@@ -80,8 +84,11 @@ function buildElementList() {
   const picked = visible.slice(0, MAX_ELEMENTS);
 
   elementRegistry = new Map();
+  fingerprintRegistry = new Map();
   const out = picked.map((el, i) => {
     elementRegistry.set(i, el);
+    const fid = elementFingerprint(el);
+    if (fid) fingerprintRegistry.set(fid, el);
     return describe(el, i);
   });
 
@@ -92,6 +99,37 @@ function resolveIndex(idx) {
   const el = elementRegistry.get(idx);
   if (!el || !el.isConnected) return null;
   return el;
+}
+
+// ─── element fingerprinting ──────────────────────────────────────────────────
+
+/** Auto-generated IDs that shift across navigations — skip these for fingerprints. */
+const UNSTABLE_ID_PATTERN = /^(:r[a-z0-9]+:|react-|turbo-|__next|radix-)/i;
+
+function elementFingerprint(el) {
+  // Priority: data-testid → stable id → aria-label+tag → text+tag+role
+  const testid = el.getAttribute("data-testid");
+  if (testid) return `tid:${testid}`;
+
+  const id = el.id;
+  if (id && !UNSTABLE_ID_PATTERN.test(id)) return `id:${id}`;
+
+  const tag = el.tagName.toLowerCase();
+  const aria = (el.getAttribute("aria-label") || "").trim();
+  if (aria) return `fp:${tag}:${aria}`;
+
+  const text = textOf(el).slice(0, 40);
+  const role = el.getAttribute("role") || "";
+  if (text) return `fp:${tag}:${role}:${text}`;
+
+  return null;
+}
+
+function resolveFingerprint(fid) {
+  if (!fid) return null;
+  const el = fingerprintRegistry.get(fid);
+  if (el && el.isConnected) return el;
+  return null;
 }
 
 function elementSignature(el) {
