@@ -90,6 +90,50 @@ Never reply in English. Never explain. Always return JSON.`;
 
 import { siteHintsFor } from "./site-hints.js";
 
+// ─── Moss hint cache ────────────────────────────────────────────────────────
+// In-memory cache for Moss-retrieved hints. Keyed by "site::taskPrefix".
+// 3-minute TTL, auto-eviction at 20 entries.
+
+const HINT_CACHE_TTL = 3 * 60 * 1000; // 3 minutes
+const HINT_CACHE_MAX = 20;
+const _hintCache = new Map();
+
+function getCachedHints(key) {
+  const entry = _hintCache.get(key);
+  if (!entry) return null;
+  if (Date.now() - entry.ts > HINT_CACHE_TTL) {
+    _hintCache.delete(key);
+    return null;
+  }
+  return entry.hints;
+}
+
+function setCachedHints(key, hints) {
+  // Evict oldest entries if at capacity
+  if (_hintCache.size >= HINT_CACHE_MAX) {
+    const oldest = _hintCache.keys().next().value;
+    _hintCache.delete(oldest);
+  }
+  _hintCache.set(key, { hints, ts: Date.now() });
+}
+
+async function fetchMossHints(task, site, insforgeUrl) {
+  if (!insforgeUrl) return null;
+  try {
+    const url = `${insforgeUrl.replace(/\/+$/, "")}/functions/moss-retrieve`;
+    const resp = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ query: task, site }),
+    });
+    if (!resp.ok) return null;
+    const data = await resp.json();
+    return typeof data?.hints === "string" ? data.hints : null;
+  } catch {
+    return null;
+  }
+}
+
 // Vision call routes through the InsForge `vision-pick` edge function, which
 // proxies to OpenRouter (via the InsForge AI Gateway) and returns clean
 // {idx, instruction, done}. The Anthropic API key never leaves the server —
@@ -350,8 +394,22 @@ async function requestNextLiveStep() {
   }
   const elements = enumResp.elements;
 
-  // 3) Call vision — inject anti-loop directive if oscillation detected.
-  let hints = siteHintsFor(tabMeta.url);
+  // 3) Call vision — resolve hints (Moss cache → Moss fetch → static fallback).
+  const hintCacheKey = `${st.site}::${st.task.slice(0, 40)}`;
+  let hints = getCachedHints(hintCacheKey);
+  if (hints !== null) {
+    console.log("[evernav] hints source: cache");
+  } else {
+    const mossHints = await fetchMossHints(st.task, st.site, cfg.insforgeUrl);
+    if (mossHints !== null) {
+      hints = mossHints;
+      setCachedHints(hintCacheKey, hints);
+      console.log("[evernav] hints source: moss");
+    } else {
+      hints = siteHintsFor(tabMeta.url);
+      console.log("[evernav] hints source: static fallback");
+    }
+  }
   const oscillation = detectOscillation(st.stepHistory || []);
   if (oscillation) {
     console.warn("[evernav] oscillation detected:", oscillation);
