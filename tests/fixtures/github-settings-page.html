@@ -1,0 +1,51 @@
+<!-- Minimal mock of GitHub settings page for E2E testing. -->
+<nav aria-label="Global">
+  <a href="/" data-testid="header-logo">GitHub</a>
+  <a href="/notifications" role="link" aria-label="Notifications">Notifications</a>
+  <button data-testid="user-menu" aria-label="Open user menu">benba</button>
+</nav>
+
+<div id="settings-frame">
+  <nav aria-label="Settings navigation">
+    <a href="/settings/profile" role="tab" data-testid="nav-profile" class="selected">Profile</a>
+    <a href="/settings/admin" role="tab" data-testid="nav-admin">Account</a>
+    <a href="/settings/appearance" role="tab" data-testid="nav-appearance">Appearance</a>
+    <a href="/settings/accessibility" role="tab" data-testid="nav-accessibility">Accessibility</a>
+    <a href="/settings/notifications" role="tab" data-testid="nav-notifications">Notifications</a>
+  </nav>
+
+  <main>
+    <h1>Public profile</h1>
+
+    <form id="profile-form">
+      <label for="user_profile_name">Name</label>
+      <input type="text" id="user_profile_name" data-testid="profile-name" value="Ben Ba" placeholder="Enter your name" />
+
+      <label for="user_profile_bio">Bio</label>
+      <textarea id="user_profile_bio" data-testid="profile-bio" placeholder="Tell us about yourself"></textarea>
+
+      <label for="user_profile_company">Company</label>
+      <input type="text" id="user_profile_company" placeholder="Company name" />
+
+      <label for="user_profile_location">Location</label>
+      <input type="text" id="user_profile_location" placeholder="Location" />
+
+      <label for="user_profile_website">Website</label>
+      <input type="text" id="user_profile_website" placeholder="https://example.com" />
+
+      <button type="submit" data-testid="save-profile" role="button">Update profile</button>
+      <button type="button" data-testid="cancel-profile" role="button">Cancel</button>
+    </form>
+
+    <section id="danger-zone">
+      <h2>Danger zone</h2>
+      <button data-testid="delete-account" role="button" aria-label="Delete your account">Delete account</button>
+    </section>
+  </main>
+</div>
+
+<footer>
+  <a href="/about">About</a>
+  <a href="/terms">Terms</a>
+  <a href="/privacy">Privacy</a>
+</footer>

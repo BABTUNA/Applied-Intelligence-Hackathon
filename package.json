@@ -1,0 +1,24 @@
+{
+  "name": "beta_evermind_hack",
+  "version": "1.0.0",
+  "description": "<p align=\"center\">   <img src=\"docs/logo.svg\" alt=\"BetterNav — live agent navigation for hostile web UIs\" width=\"780\"/> </p>",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "test": "vitest run --config tests/vitest.config.js",
+    "test:watch": "vitest --config tests/vitest.config.js",
+    "test:coverage": "vitest run --config tests/vitest.config.js --coverage"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@inferedge/moss": "^1.0.0-beta.8"
+  },
+  "devDependencies": {
+    "happy-dom": "^17.6.3",
+    "vitest": "^3.2.7"
+  }
+}

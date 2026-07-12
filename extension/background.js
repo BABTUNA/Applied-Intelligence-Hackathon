@@ -89,33 +89,9 @@ useful next step, return:
 Never reply in English. Never explain. Always return JSON.`;
 
 import { siteHintsFor } from "./site-hints.js";
-
-// ─── Moss hint cache ────────────────────────────────────────────────────────
-// In-memory cache for Moss-retrieved hints. Keyed by "site::taskPrefix".
-// 3-minute TTL, auto-eviction at 20 entries.
-
-const HINT_CACHE_TTL = 3 * 60 * 1000; // 3 minutes
-const HINT_CACHE_MAX = 20;
-const _hintCache = new Map();
-
-function getCachedHints(key) {
-  const entry = _hintCache.get(key);
-  if (!entry) return null;
-  if (Date.now() - entry.ts > HINT_CACHE_TTL) {
-    _hintCache.delete(key);
-    return null;
-  }
-  return entry.hints;
-}
-
-function setCachedHints(key, hints) {
-  // Evict oldest entries if at capacity
-  if (_hintCache.size >= HINT_CACHE_MAX) {
-    const oldest = _hintCache.keys().next().value;
-    _hintCache.delete(oldest);
-  }
-  _hintCache.set(key, { hints, ts: Date.now() });
-}
+import { getCachedHints, setCachedHints } from "./lib/hint-cache.js";
+import { detectOscillation, MAX_STEPS } from "./lib/oscillation.js";
+import { parseVisionJson } from "./lib/parse-vision.js";
 
 // Returns { hints, reachable } — reachable=false means network error (use static).
 // reachable=true + empty hints means Moss has no hints for this site (don't use static).
@@ -173,47 +149,6 @@ async function callVision({ screenshotB64, elements, task, siteHints, insforgeUr
   };
 }
 
-function parseVisionJson(text) {
-  // 1) Try strict JSON parse (handles markdown fences + leading prose).
-  const stripped = text.replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/i, "").trim();
-  const match = stripped.match(/\{[\s\S]*\}/);
-  if (match) {
-    try {
-      const parsed = JSON.parse(match[0]);
-      if (typeof parsed.idx === "number") {
-        if (typeof parsed.done !== "boolean") parsed.done = false;
-        if (typeof parsed.instruction !== "string") parsed.instruction = "Click this.";
-        return parsed;
-      }
-    } catch (e) {
-      // fall through to prose recovery
-    }
-  }
-
-  // 2) Claude returned prose — recover a "done" signal from natural language.
-  console.warn("[evernav] vision returned non-JSON; raw text:", text.slice(0, 400));
-  const lower = text.toLowerCase();
-  const doneSignals = [
-    "task is complete",
-    "task complete",
-    "appears complete",
-    "already done",
-    "no further action",
-    "no more steps",
-    "successfully completed",
-    "no actionable",
-    "cannot determine",
-    "unable to identify",
-    "this page does not",
-    "this page doesn't",
-  ];
-  if (doneSignals.some((s) => lower.includes(s))) {
-    return { idx: -1, done: true, instruction: "Task complete." };
-  }
-
-  throw new Error(`vision returned non-JSON: ${text.slice(0, 120)}`);
-}
-
 // (Evermind integration removed for the Applied Intelligence branch — today's
 // stack is Anthropic + InsForge only.)
 
@@ -254,26 +189,6 @@ async function insforgeLog({ user, site, task, stepCount, stepSummary, outcome, 
   } catch (e) {
     console.warn("[evernav] insforge log failed:", e.message);
   }
-}
-
-// ─── oscillation detection ────────────────────────────────────────────────────
-
-const MAX_STEPS = 15;
-
-function detectOscillation(stepHistory) {
-  if (!Array.isArray(stepHistory) || stepHistory.length < 3) return null;
-  const recent = stepHistory.slice(-4);
-  // Check if same fingerprint appears 2+ times in last 4 steps
-  const fidCounts = {};
-  const instrCounts = {};
-  for (const s of recent) {
-    if (s.fid) fidCounts[s.fid] = (fidCounts[s.fid] || 0) + 1;
-    if (s.instruction) instrCounts[s.instruction] = (instrCounts[s.instruction] || 0) + 1;
-  }
-  const repeatedFids = Object.entries(fidCounts).filter(([, c]) => c >= 2).map(([fid]) => fid);
-  const repeatedInstrs = Object.entries(instrCounts).filter(([, c]) => c >= 2).map(([instr]) => instr);
-  if (repeatedFids.length === 0 && repeatedInstrs.length === 0) return null;
-  return { repeatedFids, repeatedInstrs };
 }
 
 // ─── orchestration ────────────────────────────────────────────────────────────

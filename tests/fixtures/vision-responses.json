@@ -1,0 +1,32 @@
+{
+  "click_profile_name": {
+    "idx": 3,
+    "fid": "tid:profile-name",
+    "instruction": "Click the Name field to edit your profile name.",
+    "done": false
+  },
+  "click_save": {
+    "idx": 7,
+    "fid": "tid:save-profile",
+    "instruction": "Click Update profile to save changes.",
+    "done": false
+  },
+  "click_appearance": {
+    "idx": 4,
+    "fid": "tid:nav-appearance",
+    "instruction": "Click Appearance to open theme settings.",
+    "done": false
+  },
+  "task_complete": {
+    "idx": -1,
+    "fid": null,
+    "instruction": "Task complete.",
+    "done": true
+  },
+  "prose_done": "I can see the profile has been successfully updated. The task is complete and no further action is needed.",
+  "markdown_fenced": "```json\n{\"idx\": 2, \"fid\": \"tid:nav-admin\", \"instruction\": \"Click Account.\", \"done\": false}\n```",
+  "leading_prose": "Based on the screenshot, the user should click:\n{\"idx\": 5, \"fid\": null, \"instruction\": \"Click Notifications.\", \"done\": false}",
+  "bad_response": "I'm sorry, I can't help with that request. Please try again.",
+  "no_idx": "{\"instruction\": \"Click something.\", \"done\": false}",
+  "missing_defaults": "{\"idx\": 3}"
+}
