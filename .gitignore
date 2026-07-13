@@ -18,6 +18,14 @@ dashboard/node_modules/
 .venv/
 __pycache__/
 
+# Separate sub-projects (have their own git repos / are historical snapshots)
+evernav-rl/
+hackathon_v2/
+
+# Loose diagram exports (originals live in docs/)
+evernav_arch_v6*
+evernav_diagram*
+
 # OS / editor
 .DS_Store
 Thumbs.db
