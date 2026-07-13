@@ -3,11 +3,8 @@
 // Responsibilities:
 //   1. Route messages between popup ↔ content script.
 //   2. Persist session state to chrome.storage.session (SW idles after ~30s).
-//   3. Orchestrate: vision call → overlay step → success → write to Evermind + Butterbase.
-//   4. On task start, check Evermind cache first. Cache hit = replay trail, skip vision.
-//   5. Keep the SW warm during an active session via chrome.alarms.
-//
-// Structure: all stubs in this commit; vision/evermind/butterbase wired in later commits.
+//   3. Orchestrate: vision call → overlay step → log to InsForge.
+//   4. Keep the SW warm during an active session via chrome.alarms.
 
 const KEEPALIVE_ALARM = "evernav-keepalive";
 
@@ -58,7 +55,7 @@ async function getConfig() {
 
 let _lastNavAt = 0;
 
-// ─── vendor calls (stubs, filled in later commits) ────────────────────────────
+// ─── vendor calls ─────────────────────────────────────────────────────────────
 
 const VISION_MODEL = "claude-sonnet-4-6";
 const VISION_SYSTEM = `You guide users through web UIs.
@@ -147,9 +144,6 @@ async function callVision({ screenshotB64, elements, task, siteHints, insforgeUr
     done: typeof data.done === "boolean" ? data.done : false,
   };
 }
-
-// (Evermind integration removed for the Applied Intelligence branch — today's
-// stack is Anthropic + InsForge only.)
 
 // InsForge edge function `log-session`: validates, classifies the task via
 // the InsForge AI gateway (OpenRouter → Claude Haiku), then inserts into the
@@ -471,7 +465,7 @@ async function dispatchToContent(tabId, msg) {
 const DASHBOARD_URL_KEY = "dashboardUrl";
 
 async function getFallbackTrail() {
-  // Pre-baked in chrome.storage.local by the prime-evermind script (commit 16).
+  // Pre-baked in chrome.storage.local by the prime script.
   // Shape: { task, site, trail: [{target: {tag,text,aria,...}, instruction}, ...] }
   const { fallbackTrail } = await chrome.storage.local.get("fallbackTrail");
   return fallbackTrail || null;

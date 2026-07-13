@@ -1,7 +1,7 @@
-// EverNav content script (runs on github.com).
+// EverNav content script.
 //
-// This commit: viewport element enumerator + message listener skeleton.
-// Overlay rendering lands in the next commit; turbo handling after that.
+// Enumerates interactive elements, renders the spotlight overlay,
+// handles cached-trail replay, and monitors DOM stability.
 
 const MAX_ELEMENTS = 80;
 const VIEWPORT_PAD = 200; // px of slack above/below the viewport
