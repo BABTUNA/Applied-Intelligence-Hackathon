@@ -13,9 +13,9 @@ describe("createDomStabilityMonitor", () => {
   it("resolves immediately when already settled", async () => {
     const monitor = createDomStabilityMonitor();
     // Brand new monitor starts settled
-    const result = monitor.waitForSettled();
-    // Should resolve synchronously (returns resolved promise)
-    await expect(result).resolves.toBeUndefined();
+    const result = await monitor.waitForSettled();
+    // Should resolve synchronously with timedOut: false
+    expect(result).toEqual({ timedOut: false });
   });
 
   it("resolves after 400ms debounce", async () => {
@@ -89,5 +89,33 @@ describe("createDomStabilityMonitor", () => {
 
     await vi.advanceTimersByTimeAsync(100);
     expect(count).toBe(3);
+  });
+
+  it("resolves with timedOut: false on normal debounce settle", async () => {
+    const monitor = createDomStabilityMonitor({ settleDebounce: 200, hardTimeout: 5000 });
+    monitor.onMutation();
+
+    const promise = monitor.waitForSettled();
+    await vi.advanceTimersByTimeAsync(200);
+    const result = await promise;
+    expect(result).toEqual({ timedOut: false });
+  });
+
+  it("resolves with timedOut: true on hard timeout", async () => {
+    const monitor = createDomStabilityMonitor({ settleDebounce: 400, hardTimeout: 1000 });
+    monitor.onMutation();
+
+    const promise = monitor.waitForSettled();
+
+    // Keep mutating to prevent debounce from settling
+    for (let i = 0; i < 4; i++) {
+      await vi.advanceTimersByTimeAsync(200);
+      monitor.onMutation();
+    }
+
+    // Advance to hard timeout
+    await vi.advanceTimersByTimeAsync(200);
+    const result = await promise;
+    expect(result).toEqual({ timedOut: true });
   });
 });

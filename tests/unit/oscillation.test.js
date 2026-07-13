@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { detectOscillation, MAX_STEPS } from "../../extension/lib/oscillation.js";
+import { detectOscillation, classifyOscillation, MAX_STEPS } from "../../extension/lib/oscillation.js";
 
 describe("detectOscillation", () => {
   it("returns null for empty history", () => {
@@ -71,6 +71,73 @@ describe("detectOscillation", () => {
     expect(detectOscillation(null)).toBeNull();
     expect(detectOscillation(undefined)).toBeNull();
     expect(detectOscillation("not an array")).toBeNull();
+  });
+});
+
+describe("classifyOscillation", () => {
+  it("returns 'none' for short history", () => {
+    const result = classifyOscillation([{ fid: "tid:a", instruction: "Click A" }]);
+    expect(result.action).toBe("none");
+    expect(result.consecutiveOscillationCount).toBe(0);
+  });
+
+  it("returns 'warn' for a single oscillation window", () => {
+    // 1 window of oscillation: steps show A, B, A pattern
+    const history = [
+      { fid: "tid:a", instruction: "Click A" },
+      { fid: "tid:b", instruction: "Click B" },
+      { fid: "tid:a", instruction: "Click A" },
+      { fid: "tid:b", instruction: "Click B" },
+    ];
+    const result = classifyOscillation(history);
+    expect(result.action).toBe("warn");
+    expect(result.consecutiveOscillationCount).toBe(1);
+    expect(result.repeatedFids).toContain("tid:a");
+  });
+
+  it("returns 'retry_different' for 2 consecutive oscillation windows", () => {
+    // 5 steps → 2 overlapping windows both oscillating
+    const history = [
+      { fid: "tid:a", instruction: "Click A" },
+      { fid: "tid:b", instruction: "Click B" },
+      { fid: "tid:a", instruction: "Click A" },
+      { fid: "tid:b", instruction: "Click B" },
+      { fid: "tid:a", instruction: "Click A" },
+    ];
+    const result = classifyOscillation(history);
+    expect(result.action).toBe("retry_different");
+    expect(result.consecutiveOscillationCount).toBe(2);
+  });
+
+  it("returns 'hard_stop' for 3+ consecutive oscillation windows", () => {
+    // 6 steps → 3 overlapping windows all oscillating
+    const history = [
+      { fid: "tid:a", instruction: "Click A" },
+      { fid: "tid:b", instruction: "Click B" },
+      { fid: "tid:a", instruction: "Click A" },
+      { fid: "tid:b", instruction: "Click B" },
+      { fid: "tid:a", instruction: "Click A" },
+      { fid: "tid:b", instruction: "Click B" },
+    ];
+    const result = classifyOscillation(history);
+    expect(result.action).toBe("hard_stop");
+    expect(result.consecutiveOscillationCount).toBeGreaterThanOrEqual(3);
+  });
+
+  it("resets after the oscillation streak breaks", () => {
+    // Oscillation then a clean window
+    const history = [
+      { fid: "tid:a", instruction: "Click A" },
+      { fid: "tid:b", instruction: "Click B" },
+      { fid: "tid:a", instruction: "Click A" },
+      // Streak broken by unique steps
+      { fid: "tid:c", instruction: "Click C" },
+      { fid: "tid:d", instruction: "Click D" },
+      { fid: "tid:e", instruction: "Click E" },
+      { fid: "tid:f", instruction: "Click F" },
+    ];
+    const result = classifyOscillation(history);
+    expect(result.action).toBe("none");
   });
 });
 

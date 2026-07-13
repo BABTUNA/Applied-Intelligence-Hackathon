@@ -7,6 +7,10 @@
  * until the DOM has been "settled" (no mutations for `settleDebounce` ms).
  * A hard timeout ensures we never wait forever.
  *
+ * `waitForSettled()` resolves with `{ timedOut: boolean }`:
+ *   - `{ timedOut: false }` when the DOM naturally quieted down
+ *   - `{ timedOut: true }` when the hard timeout fired first
+ *
  * @param {object} [opts]
  * @param {number} [opts.settleDebounce=400] - ms of DOM quiet before "settled"
  * @param {number} [opts.hardTimeout=5000]   - ms max wait regardless of mutations
@@ -19,14 +23,17 @@ export function createDomStabilityMonitor(opts = {}) {
   let _settled = true;
   let _timer = null;
   let _hardTimer = null;
+  let _timedOut = false;
   let _pendingResolves = [];
 
   function _onSettle() {
     _settled = true;
     clearTimeout(_hardTimer);
     _hardTimer = null;
+    const didTimeout = _timedOut;
+    _timedOut = false;
     const resolves = _pendingResolves.splice(0);
-    for (const r of resolves) r();
+    for (const r of resolves) r({ timedOut: didTimeout });
   }
 
   return {
@@ -39,14 +46,19 @@ export function createDomStabilityMonitor(opts = {}) {
 
     /**
      * Returns a promise that resolves when the DOM is settled.
-     * Resolves immediately if already settled.
+     * Resolves immediately with `{ timedOut: false }` if already settled.
+     *
+     * @returns {Promise<{ timedOut: boolean }>}
      */
     waitForSettled() {
-      if (_settled) return Promise.resolve();
+      if (_settled) return Promise.resolve({ timedOut: false });
       return new Promise((resolve) => {
         _pendingResolves.push(resolve);
         if (!_hardTimer) {
-          _hardTimer = setTimeout(() => _onSettle(), HARD_TIMEOUT);
+          _hardTimer = setTimeout(() => {
+            _timedOut = true;
+            _onSettle();
+          }, HARD_TIMEOUT);
         }
       });
     },
