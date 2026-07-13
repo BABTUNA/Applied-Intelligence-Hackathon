@@ -49,7 +49,6 @@ chrome.alarms.onAlarm.addListener((alarm) => {
 
 async function getConfig() {
   return await chrome.storage.local.get([
-    "anthropic",
     "insforgeUrl",
     "insforgeAnonKey",
   ]);
