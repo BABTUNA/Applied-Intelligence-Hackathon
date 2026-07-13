@@ -617,7 +617,6 @@ const HOTKEYS = {
   Digit1: { type: "DEMO_FORCE_BEAT_1" },
   Digit2: { type: "DEMO_FORCE_BEAT_2" },
   KeyD:   { type: "DEMO_OPEN_DASHBOARD" },
-  KeyR:   { type: "DEMO_REPRIME_CACHE" },
   KeyL:   { type: "DEMO_TOGGLE_BIG_BADGE" },
 };
 
