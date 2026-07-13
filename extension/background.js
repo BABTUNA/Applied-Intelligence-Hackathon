@@ -36,9 +36,23 @@ async function stopKeepAlive() {
   await chrome.alarms.clear(KEEPALIVE_ALARM);
 }
 
-chrome.alarms.onAlarm.addListener((alarm) => {
+const STALE_STEP_THRESHOLD_MS = 45000; // 45 seconds
+
+chrome.alarms.onAlarm.addListener(async (alarm) => {
   if (alarm.name === KEEPALIVE_ALARM) {
-    // No-op: just touching the SW keeps it warm.
+    // Gap 8: Check for stale pending step — auto-stop zombie sessions.
+    const st = await getState();
+    if (
+      st &&
+      st.pendingStep != null &&
+      st.pendingStepStartedAt != null &&
+      Date.now() - st.pendingStepStartedAt > STALE_STEP_THRESHOLD_MS
+    ) {
+      console.error("[evernav] stale pending step detected (>45s) — stopping zombie session");
+      const cond = evaluateStopCondition("stale_step");
+      await notifyUser(st.tabId, cond.userMessage);
+      await stopGuidance({ tabId: st.tabId, outcome: cond.outcome, outcomeReason: cond.outcomeReason });
+    }
   }
 });
 
@@ -86,8 +100,10 @@ Never reply in English. Never explain. Always return JSON.`;
 
 import { siteHintsFor } from "./site-hints.js";
 import { getCachedHints, setCachedHints } from "./lib/hint-cache.js";
-import { detectOscillation, MAX_STEPS } from "./lib/oscillation.js";
+import { classifyOscillation, MAX_STEPS } from "./lib/oscillation.js";
 import { parseVisionJson } from "./lib/parse-vision.js";
+import { withRetry, isTransientHttpError } from "./lib/retry.js";
+import { evaluateStopCondition } from "./lib/session-guard.js";
 
 // Returns { hints, reachable } — reachable=false means network error (use static).
 // reachable=true + empty hints means Moss has no hints for this site (don't use static).
@@ -193,6 +209,9 @@ async function startGuidance({ task, user, tabId, url }) {
     task, user, site, tabId,
     trail: [], step: 0, status: "active", source: "live",
     stepHistory: [],
+    pendingStep: null,
+    pendingStepStartedAt: null,
+    diagnostics: [],
   });
   // Persistent control bar — the popup vanishes the moment the user clicks
   // anywhere outside it, so we need a Stop button that lives on the page.
@@ -234,16 +253,27 @@ async function requestNextLiveStep() {
   const st = await getState();
   if (!st || st.status !== "active") return;
 
+  // Gap 8: Checkpoint — record that a step is in progress so the keepalive
+  // alarm can detect zombie sessions if the SW crashes mid-step.
+  await setState({ pendingStep: st.step, pendingStepStartedAt: Date.now() });
+
   const cfg = await getConfig();
+
+  // Gap 6: Missing insforgeUrl — stop + notify instead of silently returning
   if (!cfg.insforgeUrl) {
     console.error("[evernav] missing insforge url — set it in options");
+    const cond = evaluateStopCondition("missing_config");
+    await notifyUser(st.tabId, cond.userMessage);
+    await stopGuidance({ tabId: st.tabId, outcome: cond.outcome, outcomeReason: cond.outcomeReason });
     return;
   }
 
-  // Hard limit — auto-stop after MAX_STEPS to prevent runaway sessions
+  // Gap 5: MAX_STEPS — show user message before stopping
   if (st.step >= MAX_STEPS) {
     console.warn("[evernav] maximum steps exceeded — stopping guidance");
-    await stopGuidance({ tabId: st.tabId, outcome: "max_steps", outcomeReason: `exceeded ${MAX_STEPS} steps` });
+    const cond = evaluateStopCondition("max_steps");
+    await notifyUser(st.tabId, cond.userMessage, "warning");
+    await stopGuidance({ tabId: st.tabId, outcome: cond.outcome, outcomeReason: cond.outcomeReason });
     return;
   }
 
@@ -275,6 +305,11 @@ async function requestNextLiveStep() {
       if (!settleResp?.ok) {
         // Content script is dead (hard nav) — fallback to a sleep
         await new Promise((r) => setTimeout(r, 1200));
+      } else if (settleResp.timedOut) {
+        // Gap 7: DOM never-settles — log to diagnostics
+        console.warn("[evernav] DOM settle timed out at step", st.step);
+        const diag = [...(st.diagnostics || []), { step: st.step, issue: "dom_settle_timeout" }];
+        await setState({ diagnostics: diag });
       }
     } catch {
       await new Promise((r) => setTimeout(r, 1200));
@@ -317,12 +352,16 @@ async function requestNextLiveStep() {
     if (enumResp?.ok && Array.isArray(enumResp.elements) && enumResp.elements.length > 0) break;
     await new Promise((r) => setTimeout(r, 500));
   }
+  // Gap 2: Enumeration failure — stop + notify instead of silent return
   if (!enumResp?.ok) {
     console.error("[evernav] could not enumerate elements after retries");
     await dispatchToContent(st.tabId, { type: "HIDE_THINKING" });
+    const cond = evaluateStopCondition("enumeration_failed");
+    await notifyUser(st.tabId, cond.userMessage);
+    await stopGuidance({ tabId: st.tabId, outcome: cond.outcome, outcomeReason: cond.outcomeReason });
     return;
   }
-  const elements = enumResp.elements;
+  let elements = enumResp.elements;
 
   // 3) Call vision — resolve hints (Moss cache → Moss fetch → static offline fallback).
   // Moss is the primary source. Static hints only fire when Moss is completely
@@ -344,40 +383,63 @@ async function requestNextLiveStep() {
       console.log("[evernav] hints source: static (offline fallback)");
     }
   }
-  const oscillation = detectOscillation(st.stepHistory || []);
-  if (oscillation) {
-    console.warn("[evernav] oscillation detected:", oscillation);
+
+  // Gap 1: 3-tier oscillation escalation
+  const oscResult = classifyOscillation(st.stepHistory || []);
+  if (oscResult.action === "hard_stop") {
+    // Tier 3: sustained oscillation — stop the session
+    console.error("[evernav] sustained oscillation — hard stop after", oscResult.consecutiveOscillationCount, "windows");
+    await dispatchToContent(st.tabId, { type: "HIDE_THINKING" });
+    const cond = evaluateStopCondition("oscillation");
+    await notifyUser(st.tabId, cond.userMessage);
+    await stopGuidance({ tabId: st.tabId, outcome: cond.outcome, outcomeReason: cond.outcomeReason });
+    return;
+  } else if (oscResult.action === "retry_different") {
+    // Tier 2: filter repeated elements from the list + stronger hint
+    console.warn("[evernav] oscillation tier 2 — filtering repeated elements:", oscResult.repeatedFids);
+    elements = elements.filter((el) => !oscResult.repeatedFids.includes(el.fid));
     const avoidList = [
-      ...oscillation.repeatedFids.map((f) => `fingerprint ${f}`),
-      ...oscillation.repeatedInstrs.map((i) => `"${i}"`),
+      ...oscResult.repeatedFids.map((f) => `fingerprint ${f}`),
+      ...oscResult.repeatedInstrs.map((i) => `"${i}"`),
+    ];
+    hints += `\n\nCRITICAL: The agent is stuck in a loop. The repeated elements have been REMOVED from the list. You MUST pick a completely different element. Do NOT reference: ${avoidList.join(", ")}.`;
+  } else if (oscResult.action === "warn") {
+    // Tier 1: append a warning hint (existing behavior)
+    console.warn("[evernav] oscillation detected:", oscResult);
+    const avoidList = [
+      ...oscResult.repeatedFids.map((f) => `fingerprint ${f}`),
+      ...oscResult.repeatedInstrs.map((i) => `"${i}"`),
     ];
     hints += `\n\nWARNING: The agent is oscillating. Do NOT click these recently-repeated elements: ${avoidList.join(", ")}. Pick a DIFFERENT element to make forward progress.`;
   }
 
+  // Gap 4: Wrap vision call in withRetry for transient HTTP errors
   let pick;
   try {
-    pick = await callVision({
-      screenshotB64,
-      elements,
-      task: st.task,
-      siteHints: hints,
-      insforgeUrl: cfg.insforgeUrl,
-      stepHistory: st.stepHistory || [],
-    });
+    pick = await withRetry(
+      () => callVision({
+        screenshotB64,
+        elements,
+        task: st.task,
+        siteHints: hints,
+        insforgeUrl: cfg.insforgeUrl,
+        stepHistory: st.stepHistory || [],
+      }),
+      { maxAttempts: 3, shouldRetry: isTransientHttpError },
+    );
   } catch (e) {
-    console.error("[evernav] vision call failed:", e);
+    console.error("[evernav] vision call failed after retries:", e);
     await dispatchToContent(st.tabId, { type: "HIDE_THINKING" });
-    // Fail-safe: stop the session so the pill doesn't get stuck and so
-    // we don't keep retrying against a bad page. User can hit Guide me
-    // again to restart from the current viewport.
-    await stopGuidance({ tabId: st.tabId, outcome: "error", outcomeReason: e.message || "vision failed" });
+    const cond = evaluateStopCondition("vision_failed");
+    await notifyUser(st.tabId, cond.userMessage);
+    await stopGuidance({ tabId: st.tabId, outcome: cond.outcome, outcomeReason: e.message || cond.outcomeReason });
     return;
   }
 
   // 4) If the model says done, flip the flag — the next STEP_COMPLETED will
   //    trigger the write+log path. If the user is already done, just close out.
   if (pick.done || pick.idx === -1) {
-    await setState({ taskDone: true });
+    await setState({ taskDone: true, pendingStep: null, pendingStepStartedAt: null });
     // Synthesize a completion (no real click happened) so onStepCompleted runs.
     onStepCompleted({ stepIndex: st.step, target: null });
     return;
@@ -397,14 +459,49 @@ async function requestNextLiveStep() {
   await setState({ stepHistory: updatedHistory });
 
   // 5) Highlight the chosen element — pass both fid and idx for fingerprint-first resolution.
+  // Gap 3: Check HIGHLIGHT_INDEX response — re-enumerate + retry once if element not found.
   const fid = pick.fid || chosenElement?.fid || null;
-  await dispatchToContent(st.tabId, {
+  const highlightResp = await dispatchToContent(st.tabId, {
     type: "HIGHLIGHT_INDEX",
     idx: pick.idx,
     fid,
     instruction: pick.instruction,
     stepIndex: st.step,
   });
+
+  if (!highlightResp?.ok || !highlightResp?.found) {
+    console.warn("[evernav] highlight failed — element not found, re-enumerating");
+    // Re-enumerate and retry once
+    const retryEnum = await dispatchToContent(st.tabId, { type: "ENUMERATE_ELEMENTS" });
+    if (retryEnum?.ok && Array.isArray(retryEnum.elements)) {
+      // Try to find the element by fid in the new list
+      const retryEl = fid ? retryEnum.elements.find((e) => e.fid === fid) : null;
+      if (retryEl) {
+        const retryHighlight = await dispatchToContent(st.tabId, {
+          type: "HIGHLIGHT_INDEX",
+          idx: retryEl.idx,
+          fid: retryEl.fid,
+          instruction: pick.instruction,
+          stepIndex: st.step,
+        });
+        if (retryHighlight?.ok && retryHighlight?.found) {
+          // Success on retry — clear pending checkpoint
+          await setState({ pendingStep: null, pendingStepStartedAt: null });
+          return;
+        }
+      }
+    }
+    // Retry failed — stop the session
+    console.error("[evernav] highlight retry failed — stopping");
+    await dispatchToContent(st.tabId, { type: "HIDE_THINKING" });
+    const cond = evaluateStopCondition("highlight_failed");
+    await notifyUser(st.tabId, cond.userMessage);
+    await stopGuidance({ tabId: st.tabId, outcome: cond.outcome, outcomeReason: cond.outcomeReason });
+    return;
+  }
+
+  // Clear pending checkpoint on successful highlight
+  await setState({ pendingStep: null, pendingStepStartedAt: null });
 }
 
 async function onStepCompleted({ stepIndex, target }) {
@@ -412,7 +509,8 @@ async function onStepCompleted({ stepIndex, target }) {
   if (!st) return;
 
   const trail = [...(st.trail || []), { stepIndex, target }];
-  await setState({ trail, step: stepIndex + 1 });
+  // Gap 8: Clear pending checkpoint on step completion
+  await setState({ trail, step: stepIndex + 1, pendingStep: null, pendingStepStartedAt: null });
 
   // If this was the final step (vision returned done:true earlier), log + close.
   if (st.taskDone) {
@@ -458,6 +556,12 @@ async function dispatchToContent(tabId, msg) {
       return null;
     }
   }
+}
+
+// ─── user notification helper ─────────────────────────────────────────────────
+
+async function notifyUser(tabId, message, level = "error") {
+  await dispatchToContent(tabId, { type: "SHOW_USER_MESSAGE", message, level });
 }
 
 // ─── demo-day fallbacks ───────────────────────────────────────────────────────

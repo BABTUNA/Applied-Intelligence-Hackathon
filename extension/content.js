@@ -150,6 +150,7 @@ const OVERLAY_IDS = [
   "__evernav_clone__",
   "__evernav_halo__",
   "__evernav_tooltip__",
+  "__evernav_user_message__",
 ];
 
 let overlayState = null; // { target, onResize, onClick, instruction }
@@ -340,6 +341,30 @@ function hideControl() {
   controlEl = null;
 }
 
+// ─── user message toast (error/warning feedback) ─────────────────────────────
+
+let userMessageEl = null;
+let userMessageTimer = null;
+
+function showUserMessage(message, level = "error") {
+  hideUserMessage();
+  userMessageEl = document.createElement("div");
+  userMessageEl.id = "__evernav_user_message__";
+  const levelClass = `__evernav_level_${level}__`;
+  userMessageEl.className = levelClass;
+  userMessageEl.textContent = message;
+  document.documentElement.appendChild(userMessageEl);
+  // Auto-dismiss after 8 seconds
+  userMessageTimer = setTimeout(() => hideUserMessage(), 8000);
+}
+
+function hideUserMessage() {
+  clearTimeout(userMessageTimer);
+  userMessageTimer = null;
+  userMessageEl?.remove();
+  userMessageEl = null;
+}
+
 // ─── signature-based element re-finding (for cached trail replay) ─────────────
 
 function scoreMatch(candSig, want) {
@@ -469,21 +494,26 @@ const DomStabilityMonitor = {
     this._timer = setTimeout(() => this._onSettle(), debounce);
   },
 
+  _timedOut: false,
+
   _onSettle() {
     this._settled = true;
     clearTimeout(this._hardTimer);
     this._hardTimer = null;
+    const didTimeout = this._timedOut;
+    this._timedOut = false;
     const resolves = this._pendingResolves.splice(0);
-    for (const r of resolves) r();
+    for (const r of resolves) r({ timedOut: didTimeout });
   },
 
   waitForSettled() {
-    if (this._settled) return Promise.resolve();
+    if (this._settled) return Promise.resolve({ timedOut: false });
     return new Promise((resolve) => {
       this._pendingResolves.push(resolve);
       // Hard timeout: don't wait forever.
       if (!this._hardTimer) {
         this._hardTimer = setTimeout(() => {
+          this._timedOut = true;
           this._onSettle();
         }, this.HARD_TIMEOUT);
       }
@@ -567,8 +597,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           break;
         }
         case "WAIT_FOR_SETTLED": {
-          await DomStabilityMonitor.waitForSettled();
-          sendResponse({ ok: true, settled: true });
+          const settleResult = await DomStabilityMonitor.waitForSettled();
+          sendResponse({ ok: true, settled: true, timedOut: settleResult?.timedOut ?? false });
           break;
         }
         case "CLEAR_OVERLAY": {
@@ -594,6 +624,16 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         }
         case "HIDE_CONTROL": {
           hideControl();
+          sendResponse({ ok: true });
+          break;
+        }
+        case "SHOW_USER_MESSAGE": {
+          showUserMessage(msg.message, msg.level || "error");
+          sendResponse({ ok: true });
+          break;
+        }
+        case "HIDE_USER_MESSAGE": {
+          hideUserMessage();
           sendResponse({ ok: true });
           break;
         }

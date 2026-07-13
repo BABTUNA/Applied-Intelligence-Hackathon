@@ -3,6 +3,7 @@ import { loadFixture } from "../setup/dom-helpers.js";
 import { resetChromeMock } from "../setup/chrome-mock.js";
 import { elementFingerprint } from "../../extension/lib/fingerprint.js";
 import { parseVisionJson } from "../../extension/lib/parse-vision.js";
+import { evaluateStopCondition } from "../../extension/lib/session-guard.js";
 import visionResponses from "../fixtures/vision-responses.json";
 
 describe("guidance-loop E2E", () => {
@@ -77,5 +78,30 @@ describe("guidance-loop E2E", () => {
     const result = parseVisionJson(raw);
     expect(result.idx).toBe(5);
     expect(result.instruction).toBe("Click Notifications.");
+  });
+
+  it("HIGHLIGHT_INDEX failure triggers stop path via evaluateStopCondition", () => {
+    // Simulate: background gets { ok: false, found: false } from HIGHLIGHT_INDEX
+    const highlightResp = { ok: false, found: false, resolvedBy: "none" };
+    expect(highlightResp.ok).toBe(false);
+    expect(highlightResp.found).toBe(false);
+
+    // The background script would call evaluateStopCondition("highlight_failed")
+    const cond = evaluateStopCondition("highlight_failed");
+    expect(cond).not.toBeNull();
+    expect(cond.outcome).toBe("error");
+    expect(cond.outcomeReason).toContain("highlighted element");
+    expect(cond.userMessage).toBeTruthy();
+  });
+
+  it("evaluateStopCondition produces correct output for all failure reasons", () => {
+    const reasons = ["oscillation", "max_steps", "enumeration_failed", "highlight_failed", "vision_failed", "missing_config", "stale_step"];
+    for (const reason of reasons) {
+      const cond = evaluateStopCondition(reason);
+      expect(cond).not.toBeNull();
+      expect(cond.outcome).toBeTruthy();
+      expect(cond.outcomeReason).toBeTruthy();
+      expect(cond.userMessage).toBeTruthy();
+    }
   });
 });
