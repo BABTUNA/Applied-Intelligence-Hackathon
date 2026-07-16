@@ -15,11 +15,17 @@ async function getState() {
   return sessionState || null;
 }
 
+let _stateQueue = Promise.resolve();
+
 async function setState(patch) {
-  const cur = (await getState()) || {};
-  const next = { ...cur, ...patch };
-  await chrome.storage.session.set({ sessionState: next });
-  return next;
+  const result = _stateQueue.then(async () => {
+    const cur = (await getState()) || {};
+    const next = { ...cur, ...patch };
+    await chrome.storage.session.set({ sessionState: next });
+    return next;
+  });
+  _stateQueue = result.catch(() => {});
+  return result;
 }
 
 async function clearState() {
