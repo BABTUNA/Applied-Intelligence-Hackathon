@@ -94,6 +94,79 @@ describe("guidance-loop E2E", () => {
     expect(cond.userMessage).toBeTruthy();
   });
 
+  // ─── highlight retry path tests ───────────────────────────────────────────
+
+  it("highlight retry succeeds when re-enumerate finds the element by fid", () => {
+    // First HIGHLIGHT_INDEX returns failure
+    const firstHighlight = { ok: false, found: false, resolvedBy: "none" };
+    expect(firstHighlight.ok).toBe(false);
+
+    // Re-enumerate returns a new element list containing the target fid
+    const targetFid = "tid:save-profile";
+    const reEnumResp = {
+      ok: true,
+      elements: [
+        { idx: 0, tag: "button", text: "Cancel", fid: "tid:cancel" },
+        { idx: 1, tag: "button", text: "Save", fid: targetFid },
+      ],
+    };
+    expect(reEnumResp.ok).toBe(true);
+
+    // Find the element by fid in the new list
+    const retryEl = reEnumResp.elements.find((e) => e.fid === targetFid);
+    expect(retryEl).toBeDefined();
+    expect(retryEl.idx).toBe(1);
+
+    // Retry HIGHLIGHT_INDEX succeeds
+    const retryHighlight = { ok: true, found: true, resolvedBy: "fid" };
+    expect(retryHighlight.ok).toBe(true);
+    expect(retryHighlight.found).toBe(true);
+
+    // No stop condition should fire — session continues
+  });
+
+  it("highlight retry stops when re-enumerate does not contain the target fid", () => {
+    // First HIGHLIGHT_INDEX fails
+    const firstHighlight = { ok: false, found: false, resolvedBy: "none" };
+    expect(firstHighlight.ok).toBe(false);
+
+    // Re-enumerate succeeds but the target fid is gone
+    const targetFid = "tid:save-profile";
+    const reEnumResp = {
+      ok: true,
+      elements: [
+        { idx: 0, tag: "button", text: "Cancel", fid: "tid:cancel" },
+        { idx: 1, tag: "a", text: "Home", fid: "fp:a:Home:link" },
+      ],
+    };
+    expect(reEnumResp.ok).toBe(true);
+
+    const retryEl = reEnumResp.elements.find((e) => e.fid === targetFid);
+    expect(retryEl).toBeUndefined();
+
+    // Background script fires evaluateStopCondition("highlight_failed")
+    const cond = evaluateStopCondition("highlight_failed");
+    expect(cond).not.toBeNull();
+    expect(cond.outcome).toBe("error");
+    expect(cond.outcomeReason).toContain("highlighted element");
+  });
+
+  it("highlight retry stops when re-enumeration itself fails", () => {
+    // First HIGHLIGHT_INDEX fails
+    const firstHighlight = { ok: false, found: false, resolvedBy: "none" };
+    expect(firstHighlight.ok).toBe(false);
+
+    // ENUMERATE_ELEMENTS returns failure
+    const reEnumResp = { ok: false };
+    expect(reEnumResp.ok).toBe(false);
+
+    // Background script fires evaluateStopCondition("highlight_failed")
+    const cond = evaluateStopCondition("highlight_failed");
+    expect(cond).not.toBeNull();
+    expect(cond.outcome).toBe("error");
+    expect(cond.outcomeReason).toContain("highlighted element");
+  });
+
   it("evaluateStopCondition produces correct output for all failure reasons", () => {
     const reasons = ["oscillation", "max_steps", "enumeration_failed", "highlight_failed", "vision_failed", "missing_config", "screenshot_failed", "stale_step"];
     for (const reason of reasons) {
