@@ -41,6 +41,13 @@ describe("evaluateStopCondition", () => {
     expect(result.userMessage).toContain("InsForge");
   });
 
+  it("returns correct outcome for screenshot_failed", () => {
+    const result = evaluateStopCondition("screenshot_failed");
+    expect(result.outcome).toBe("error");
+    expect(result.outcomeReason).toContain("screenshot");
+    expect(result.userMessage).toContain("screen");
+  });
+
   it("returns correct outcome for stale_step", () => {
     const result = evaluateStopCondition("stale_step");
     expect(result.outcome).toBe("error");

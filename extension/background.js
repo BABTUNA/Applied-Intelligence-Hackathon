@@ -343,10 +343,25 @@ async function requestNextLiveStep() {
     await stopGuidance({ tabId: st.tabId, outcome: "error", outcomeReason: "non-screenshotable URL" });
     return;
   }
-  const screenshotDataUrl = await chrome.tabs.captureVisibleTab(tabMeta.windowId, {
-    format: "jpeg",
-    quality: 70,
-  });
+  let screenshotDataUrl;
+  try {
+    screenshotDataUrl = await Promise.race([
+      chrome.tabs.captureVisibleTab(tabMeta.windowId, {
+        format: "jpeg",
+        quality: 70,
+      }),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error("screenshot timed out after 5s")), 5000)
+      ),
+    ]);
+  } catch (e) {
+    console.error("[evernav] screenshot capture failed:", e.message);
+    await dispatchToContent(st.tabId, { type: "HIDE_THINKING" });
+    const cond = evaluateStopCondition("screenshot_failed");
+    await notifyUser(st.tabId, cond.userMessage);
+    await stopGuidance({ tabId: st.tabId, outcome: cond.outcome, outcomeReason: cond.outcomeReason });
+    return;
+  }
   const screenshotB64 = screenshotDataUrl.split(",")[1];
 
   // 2) Ask the content script for the current interactive-element list.

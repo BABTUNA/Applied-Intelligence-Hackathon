@@ -38,6 +38,11 @@ const STOP_MAP = {
     outcomeReason: "insforge url not configured",
     userMessage: "EverNav is not configured. Please set the InsForge URL in extension options.",
   },
+  screenshot_failed: {
+    outcome: "error",
+    outcomeReason: "screenshot capture failed or timed out",
+    userMessage: "Could not capture the screen. The tab may be unresponsive — please try again.",
+  },
   stale_step: {
     outcome: "error",
     outcomeReason: "step timed out (zombie session)",

@@ -95,7 +95,7 @@ describe("guidance-loop E2E", () => {
   });
 
   it("evaluateStopCondition produces correct output for all failure reasons", () => {
-    const reasons = ["oscillation", "max_steps", "enumeration_failed", "highlight_failed", "vision_failed", "missing_config", "stale_step"];
+    const reasons = ["oscillation", "max_steps", "enumeration_failed", "highlight_failed", "vision_failed", "missing_config", "screenshot_failed", "stale_step"];
     for (const reason of reasons) {
       const cond = evaluateStopCondition(reason);
       expect(cond).not.toBeNull();
